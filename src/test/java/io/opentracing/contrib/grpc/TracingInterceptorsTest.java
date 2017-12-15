@@ -13,6 +13,8 @@
  */
 package io.opentracing.contrib.grpc;
 
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -20,6 +22,8 @@ import static org.junit.Assert.assertTrue;
 import io.grpc.MethodDescriptor;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -44,6 +48,8 @@ public class TracingInterceptorsTest {
       service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
+
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
       assertEquals("one span should have been created and finished for one client request",
           serviceTracer.finishedSpans().size(), 1);
 
@@ -78,6 +84,8 @@ public class TracingInterceptorsTest {
       service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
+
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
       assertEquals("one span should have been created and finished for one client request",
           serviceTracer.finishedSpans().size(), 1);
 
@@ -112,6 +120,8 @@ public class TracingInterceptorsTest {
       service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
+
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
       assertEquals("one span should have been created and finished for one client request",
           serviceTracer.finishedSpans().size(), 1);
 
@@ -152,6 +162,8 @@ public class TracingInterceptorsTest {
       service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
+
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
       assertEquals("one span should have been created and finished for one client request",
           serviceTracer.finishedSpans().size(), 1);
 
@@ -186,6 +198,8 @@ public class TracingInterceptorsTest {
       service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
+
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
       assertEquals("one span should have been created and finished for one client request",
           serviceTracer.finishedSpans().size(), 1);
 
@@ -395,6 +409,8 @@ public class TracingInterceptorsTest {
       assertTrue("call should complete", client.greet("world"));
       assertEquals("a client span should have been created for the request",
           1, clientTracer.finishedSpans().size());
+
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
       assertEquals("a server span should have been created for the request",
           1, serverTracer.finishedSpans().size());
 
@@ -412,5 +428,14 @@ public class TracingInterceptorsTest {
       service.stop();
       clientTracer.reset();
     }
+  }
+
+  private Callable<Integer> reportedSpansSize(final MockTracer mockTracer) {
+    return new Callable<Integer>() {
+      @Override
+      public Integer call() {
+        return mockTracer.finishedSpans().size();
+      }
+    };
   }
 }
