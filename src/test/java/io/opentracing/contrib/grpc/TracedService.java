@@ -55,15 +55,14 @@ public class TracedService {
     });
   }
 
-  void blockUntilShutdown() throws InterruptedException {
-    if (server != null) {
-      server.awaitTermination();
-    }
-  }
-
   void stop() {
     if (server != null) {
       server.shutdown();
+      try {
+        server.awaitTermination();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
     }
   }
 
