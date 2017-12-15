@@ -23,10 +23,9 @@ import java.io.IOException;
 
 public class TracedService {
 
-  private int port = 50051;
   private Server server;
 
-  void start() throws IOException {
+  void start(int port) throws IOException {
     server = ServerBuilder.forPort(port)
         .addService(new GreeterImpl())
         .build()
@@ -40,7 +39,7 @@ public class TracedService {
     });
   }
 
-  void startWithInterceptor(ServerTracingInterceptor tracingInterceptor) throws IOException {
+  void startWithInterceptor(ServerTracingInterceptor tracingInterceptor, int port) throws IOException {
 
     server = ServerBuilder.forPort(port)
         .addService(tracingInterceptor.intercept(new GreeterImpl()))

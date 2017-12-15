@@ -20,20 +20,28 @@ import static org.junit.Assert.assertTrue;
 import io.grpc.MethodDescriptor;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
+import org.junit.Before;
 import org.junit.Test;
 
 public class TracingInterceptorsTest {
 
+  private int port = 50050;
+
+  @Before
+  public void before() {
+    port++;
+  }
+
   @Test
   public void TestTracedServerBasic() {
-    TracedClient client = new TracedClient("localhost", 50051, null);
+    TracedClient client = new TracedClient("localhost", port, null);
 
     MockTracer serviceTracer = new MockTracer();
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serviceTracer);
     TracedService service = new TracedService();
 
     try {
-      service.startWithInterceptor(tracingInterceptor);
+      service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -57,7 +65,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void TestTracedServerWithVerbosity() {
-    TracedClient client = new TracedClient("localhost", 50051, null);
+    TracedClient client = new TracedClient("localhost", port, null);
 
     MockTracer serviceTracer = new MockTracer();
     TracedService service = new TracedService();
@@ -67,7 +75,7 @@ public class TracingInterceptorsTest {
         .build();
 
     try {
-      service.startWithInterceptor(tracingInterceptor);
+      service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -91,7 +99,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void TestTracedServerWithStreaming() {
-    TracedClient client = new TracedClient("localhost", 50051, null);
+    TracedClient client = new TracedClient("localhost", port, null);
 
     MockTracer serviceTracer = new MockTracer();
     TracedService service = new TracedService();
@@ -101,7 +109,7 @@ public class TracingInterceptorsTest {
         .build();
 
     try {
-      service.startWithInterceptor(tracingInterceptor);
+      service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -126,7 +134,7 @@ public class TracingInterceptorsTest {
   @Test
   public void TestTracedServerWithCustomOperationName() {
     final String PREFIX = "testing-";
-    TracedClient client = new TracedClient("localhost", 50051, null);
+    TracedClient client = new TracedClient("localhost", port, null);
 
     MockTracer serviceTracer = new MockTracer();
     TracedService service = new TracedService();
@@ -141,7 +149,7 @@ public class TracingInterceptorsTest {
         .build();
 
     try {
-      service.startWithInterceptor(tracingInterceptor);
+      service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -165,7 +173,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void TestTracedServerWithTracedAttributes() {
-    TracedClient client = new TracedClient("localhost", 50051, null);
+    TracedClient client = new TracedClient("localhost", port, null);
 
     MockTracer serviceTracer = new MockTracer();
     TracedService service = new TracedService();
@@ -175,7 +183,7 @@ public class TracingInterceptorsTest {
         .build();
 
     try {
-      service.startWithInterceptor(tracingInterceptor);
+      service.startWithInterceptor(tracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -203,10 +211,10 @@ public class TracingInterceptorsTest {
 
     MockTracer clientTracer = new MockTracer();
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
-    TracedClient client = new TracedClient("localhost", 50051, tracingInterceptor);
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     try {
-      service.start();
+      service.start(port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -236,10 +244,10 @@ public class TracingInterceptorsTest {
         .Builder(clientTracer)
         .withVerbosity()
         .build();
-    TracedClient client = new TracedClient("localhost", 50051, tracingInterceptor);
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     try {
-      service.start();
+      service.start(port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -271,10 +279,10 @@ public class TracingInterceptorsTest {
         .Builder(clientTracer)
         .withStreaming()
         .build();
-    TracedClient client = new TracedClient("localhost", 50051, tracingInterceptor);
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     try {
-      service.start();
+      service.start(port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -311,10 +319,10 @@ public class TracingInterceptorsTest {
           }
         })
         .build();
-    TracedClient client = new TracedClient("localhost", 50051, tracingInterceptor);
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     try {
-      service.start();
+      service.start(port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -345,10 +353,10 @@ public class TracingInterceptorsTest {
         .Builder(clientTracer)
         .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
         .build();
-    TracedClient client = new TracedClient("localhost", 50051, tracingInterceptor);
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     try {
-      service.start();
+      service.start(port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("one span should have been created and finished for one client request",
@@ -376,13 +384,13 @@ public class TracingInterceptorsTest {
     MockTracer serverTracer = new MockTracer();
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
-    TracedClient client = new TracedClient("localhost", 50051, tracingInterceptor);
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
     TracedService service = new TracedService();
 
     try {
-      service.startWithInterceptor(serverTracingInterceptor);
+      service.startWithInterceptor(serverTracingInterceptor, port);
 
       assertTrue("call should complete", client.greet("world"));
       assertEquals("a client span should have been created for the request",
