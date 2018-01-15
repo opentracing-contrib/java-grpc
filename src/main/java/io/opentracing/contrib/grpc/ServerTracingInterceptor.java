@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 The OpenTracing Authors
+ * Copyright 2017-2018 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -174,14 +174,14 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS,
           new TextMapExtractAdapter(headers));
       if (parentSpanCtx == null) {
-        span = tracer.buildSpan(operationName).startManual();
+        span = tracer.buildSpan(operationName).start();
       } else {
-        span = tracer.buildSpan(operationName).asChildOf(parentSpanCtx).startManual();
+        span = tracer.buildSpan(operationName).asChildOf(parentSpanCtx).start();
       }
     } catch (IllegalArgumentException iae) {
       span = tracer.buildSpan(operationName)
           .withTag("Error", "Extract failed and an IllegalArgumentException was thrown")
-          .startManual();
+          .start();
     }
     return span;
   }

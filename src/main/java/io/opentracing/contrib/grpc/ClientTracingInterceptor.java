@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 The OpenTracing Authors
+ * Copyright 2017-2018 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -232,9 +232,9 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
   private Span createSpanFromParent(Span parentSpan, String operationName) {
     if (parentSpan == null) {
-      return tracer.buildSpan(operationName).startManual();
+      return tracer.buildSpan(operationName).start();
     } else {
-      return tracer.buildSpan(operationName).asChildOf(parentSpan).startManual();
+      return tracer.buildSpan(operationName).asChildOf(parentSpan).start();
     }
   }
 
