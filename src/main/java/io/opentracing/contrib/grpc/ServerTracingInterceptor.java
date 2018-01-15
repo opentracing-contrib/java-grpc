@@ -174,14 +174,14 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS,
           new TextMapExtractAdapter(headers));
       if (parentSpanCtx == null) {
-        span = tracer.buildSpan(operationName).startManual();
+        span = tracer.buildSpan(operationName).start();
       } else {
-        span = tracer.buildSpan(operationName).asChildOf(parentSpanCtx).startManual();
+        span = tracer.buildSpan(operationName).asChildOf(parentSpanCtx).start();
       }
     } catch (IllegalArgumentException iae) {
       span = tracer.buildSpan(operationName)
           .withTag("Error", "Extract failed and an IllegalArgumentException was thrown")
-          .startManual();
+          .start();
     }
     return span;
   }

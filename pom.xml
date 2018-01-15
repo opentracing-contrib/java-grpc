@@ -60,7 +60,7 @@
     <project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 
     <grpc.version>1.8.0</grpc.version>
-    <opentracing.version>0.30.0</opentracing.version>
+    <opentracing.version>0.31.0</opentracing.version>
   </properties>
 
   <dependencies>
