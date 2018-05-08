@@ -10,7 +10,7 @@ pom.xml
 <dependency>
     <groupId>io.opentracing.contrib</groupId>
     <artifactId>opentracing-grpc</artifactId>
-    <version>0.0.2</version>
+    <version>VERSION</version>
 </dependency>
 ```
 
