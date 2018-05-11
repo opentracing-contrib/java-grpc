@@ -18,6 +18,7 @@ import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import io.grpc.MethodDescriptor;
 import io.opentracing.mock.MockSpan;
@@ -62,7 +63,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       serviceTracer.reset();
@@ -98,7 +99,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       serviceTracer.reset();
@@ -134,7 +135,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       serviceTracer.reset();
@@ -176,7 +177,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       serviceTracer.reset();
@@ -212,7 +213,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       serviceTracer.reset();
@@ -242,7 +243,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       clientTracer.reset();
@@ -277,7 +278,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       clientTracer.reset();
@@ -311,7 +312,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       clientTracer.reset();
@@ -351,7 +352,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       clientTracer.reset();
@@ -385,7 +386,7 @@ public class TracingInterceptorsTest {
       assertFalse("span should have no baggage",
           span.context().baggageItems().iterator().hasNext());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       clientTracer.reset();
@@ -423,7 +424,7 @@ public class TracingInterceptorsTest {
       assertTrue("client span should end after server span",
           clientSpan.finishMicros() >= serverSpan.finishMicros());
     } catch (Exception e) {
-      assertTrue(e.getMessage(), false);
+      fail(e.getMessage());
     } finally {
       service.stop();
       clientTracer.reset();
