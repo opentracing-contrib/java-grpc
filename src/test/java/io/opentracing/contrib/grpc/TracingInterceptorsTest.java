@@ -424,9 +424,10 @@ public class TracingInterceptorsTest {
       // doesn't allow for creating new contexts outside of its package to pass in to asChildOf
       assertTrue("client span should start before server span",
           clientSpan.startMicros() <= serverSpan.startMicros());
+
+      // TODO: next assert sometimes fails
       assertTrue("client span " + clientSpan.finishMicros() + " should end after server span "
-              + serverSpan.finishMicros(),
-          clientSpan.finishMicros() >= serverSpan.finishMicros());
+          + serverSpan.finishMicros(), clientSpan.finishMicros() >= serverSpan.finishMicros());
     } catch (Exception e) {
       fail(e.getMessage());
     } finally {
