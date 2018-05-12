@@ -412,8 +412,11 @@ public class TracingInterceptorsTest {
           1, clientTracer.finishedSpans().size());
 
       await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
       assertEquals("a server span should have been created for the request",
           1, serverTracer.finishedSpans().size());
+      assertEquals("a client span should have been created for the request",
+          1, clientTracer.finishedSpans().size());
 
       MockSpan serverSpan = serverTracer.finishedSpans().get(0);
       MockSpan clientSpan = clientTracer.finishedSpans().get(0);
