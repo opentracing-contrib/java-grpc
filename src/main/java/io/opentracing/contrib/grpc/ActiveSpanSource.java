@@ -24,7 +24,7 @@ public interface ActiveSpanSource {
    * ActiveSpanSource implementation that always returns
    * null as the active span
    */
-  public static ActiveSpanSource NONE = new ActiveSpanSource() {
+  ActiveSpanSource NONE = new ActiveSpanSource() {
     @Override
     public Span getActiveSpan() {
       return null;
@@ -36,7 +36,7 @@ public interface ActiveSpanSource {
    * current span stored in the GRPC context under
    * {@link OpenTracingContextKey}
    */
-  public static ActiveSpanSource GRPC_CONTEXT = new ActiveSpanSource() {
+  ActiveSpanSource GRPC_CONTEXT = new ActiveSpanSource() {
     @Override
     public Span getActiveSpan() {
       return OpenTracingContextKey.activeSpan();
@@ -46,5 +46,5 @@ public interface ActiveSpanSource {
   /**
    * @return the active span
    */
-  public Span getActiveSpan();
+  Span getActiveSpan();
 }

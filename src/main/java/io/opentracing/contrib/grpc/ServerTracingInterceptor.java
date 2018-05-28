@@ -24,6 +24,7 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
 import io.grpc.ServerServiceDefinition;
+import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
@@ -128,44 +129,60 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     ServerCall.Listener<ReqT> listenerWithContext = Contexts
         .interceptCall(ctxWithSpan, call, headers, next);
 
-    ServerCall.Listener<ReqT> tracingListenerWithContext =
-        new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
-            listenerWithContext) {
+    return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
+        listenerWithContext) {
 
-          @Override
-          public void onMessage(ReqT message) {
-            if (streaming || verbose) {
-              span.log(ImmutableMap.of("Message received", message));
-            }
-            delegate().onMessage(message);
-          }
+      @Override
+      public void onMessage(ReqT message) {
+        if (streaming || verbose) {
+          span.log(ImmutableMap.of("Message received", message));
+        }
+        Scope scope = tracer.scopeManager().activate(span, false);
+        try {
+          delegate().onMessage(message);
+        } finally {
+          scope.close();
+        }
+      }
 
-          @Override
-          public void onHalfClose() {
-            if (streaming) {
-              span.log("Client finished sending messages");
-            }
-            delegate().onHalfClose();
-          }
+      @Override
+      public void onHalfClose() {
+        if (streaming) {
+          span.log("Client finished sending messages");
+        }
+        Scope scope = tracer.scopeManager().activate(span, false);
+        try {
+          delegate().onHalfClose();
+        } finally {
+          scope.close();
+        }
 
-          @Override
-          public void onCancel() {
-            span.log("Call cancelled");
-            span.finish();
-            delegate().onCancel();
-          }
+      }
 
-          @Override
-          public void onComplete() {
-            if (verbose) {
-              span.log("Call completed");
-            }
-            span.finish();
-            delegate().onComplete();
-          }
-        };
+      @Override
+      public void onCancel() {
+        Scope scope = tracer.scopeManager().activate(span, true);
+        span.log("Call cancelled");
+        try {
+          delegate().onCancel();
+        } finally {
+          scope.close();
+        }
+      }
 
-    return tracingListenerWithContext;
+      @Override
+      public void onComplete() {
+        if (verbose) {
+          span.log("Call completed");
+        }
+        Scope scope = tracer.scopeManager().activate(span, true);
+        try {
+          delegate().onComplete();
+        } finally {
+          scope.close();
+        }
+      }
+    };
   }
 
   private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {

@@ -18,139 +18,127 @@ import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import io.grpc.MethodDescriptor;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
+import io.opentracing.util.GlobalTracer;
+import io.opentracing.util.GlobalTracerTestUtil;
+import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class TracingInterceptorsTest {
 
   private int port = 50050;
+  private final MockTracer clientTracer = new MockTracer();
+  private final MockTracer serverTracer = new MockTracer();
+  private TracedService service;
 
   @Before
   public void before() {
     port++;
+    GlobalTracerTestUtil.resetGlobalTracer();
+    clientTracer.reset();
+    serverTracer.reset();
+    service = new TracedService();
   }
 
-  @Test
-  public void TestTracedServerBasic() {
-    TracedClient client = new TracedClient("localhost", port, null);
-
-    MockTracer serviceTracer = new MockTracer();
-    ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serviceTracer);
-    TracedService service = new TracedService();
-
-    try {
-      service.startWithInterceptor(tracingInterceptor, port);
-
-      assertTrue("call should complete", client.greet("world"));
-
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
-      assertEquals("one span should have been created and finished for one client request",
-          serviceTracer.finishedSpans().size(), 1);
-
-      MockSpan span = serviceTracer.finishedSpans().get(0);
-      assertEquals("span should have default name", span.operationName(),
-          "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertTrue("span should have no logs", span.logEntries().isEmpty());
-      assertTrue("span should have no tags", span.tags().isEmpty());
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
+  @After
+  public void after() {
+    if (service != null) {
       service.stop();
-      serviceTracer.reset();
     }
   }
 
   @Test
-  public void TestTracedServerWithVerbosity() {
+  public void TestTracedServerBasic() throws IOException {
     TracedClient client = new TracedClient("localhost", port, null);
 
-    MockTracer serviceTracer = new MockTracer();
-    TracedService service = new TracedService();
+    ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
+
+    service.startWithInterceptor(tracingInterceptor, port);
+
+    assertTrue("call should complete", client.greet("world"));
+
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(), 1);
+
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have default name", span.operationName(),
+        "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertTrue("span should have no logs", span.logEntries().isEmpty());
+    assertTrue("span should have no tags", span.tags().isEmpty());
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void TestTracedServerWithVerbosity() throws IOException {
+    TracedClient client = new TracedClient("localhost", port, null);
+
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
-        .Builder(serviceTracer)
+        .Builder(serverTracer)
         .withVerbosity()
         .build();
 
-    try {
-      service.startWithInterceptor(tracingInterceptor, port);
+    service.startWithInterceptor(tracingInterceptor, port);
 
-      assertTrue("call should complete", client.greet("world"));
+    assertTrue("call should complete", client.greet("world"));
 
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
-      assertEquals("one span should have been created and finished for one client request",
-          serviceTracer.finishedSpans().size(), 1);
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(), 1);
 
-      MockSpan span = serviceTracer.finishedSpans().get(0);
-      assertEquals("span should have default name", span.operationName(),
-          "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should log onMessage and onComplete", 2, span.logEntries().size());
-      assertTrue("span should have no tags", span.tags().isEmpty());
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      serviceTracer.reset();
-    }
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have default name", span.operationName(),
+        "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should log onMessage and onComplete", 2, span.logEntries().size());
+    assertTrue("span should have no tags", span.tags().isEmpty());
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedServerWithStreaming() {
+  public void TestTracedServerWithStreaming() throws IOException {
     TracedClient client = new TracedClient("localhost", port, null);
 
-    MockTracer serviceTracer = new MockTracer();
-    TracedService service = new TracedService();
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
-        .Builder(serviceTracer)
+        .Builder(serverTracer)
         .withStreaming()
         .build();
 
-    try {
-      service.startWithInterceptor(tracingInterceptor, port);
+    service.startWithInterceptor(tracingInterceptor, port);
 
-      assertTrue("call should complete", client.greet("world"));
+    assertTrue("call should complete", client.greet("world"));
 
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
-      assertEquals("one span should have been created and finished for one client request",
-          serviceTracer.finishedSpans().size(), 1);
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(), 1);
 
-      MockSpan span = serviceTracer.finishedSpans().get(0);
-      assertEquals("span should have default name", span.operationName(),
-          "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should log onMessage and onHalfClose", span.logEntries().size(), 2);
-      assertTrue("span should have no tags", span.tags().isEmpty());
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      serviceTracer.reset();
-    }
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have default name", span.operationName(),
+        "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should log onMessage and onHalfClose", span.logEntries().size(), 2);
+    assertTrue("span should have no tags", span.tags().isEmpty());
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedServerWithCustomOperationName() {
+  public void TestTracedServerWithCustomOperationName() throws IOException {
     final String PREFIX = "testing-";
     TracedClient client = new TracedClient("localhost", port, null);
 
-    MockTracer serviceTracer = new MockTracer();
-    TracedService service = new TracedService();
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
-        .Builder(serviceTracer)
+        .Builder(serverTracer)
         .withOperationName(new OperationNameConstructor() {
           @Override
           public <ReqT, RespT> String constructOperationName(MethodDescriptor<ReqT, RespT> method) {
@@ -159,172 +147,127 @@ public class TracingInterceptorsTest {
         })
         .build();
 
-    try {
-      service.startWithInterceptor(tracingInterceptor, port);
+    service.startWithInterceptor(tracingInterceptor, port);
 
-      assertTrue("call should complete", client.greet("world"));
+    assertTrue("call should complete", client.greet("world"));
 
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
-      assertEquals("one span should have been created and finished for one client request",
-          serviceTracer.finishedSpans().size(), 1);
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(), 1);
 
-      MockSpan span = serviceTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(),
-          PREFIX + "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should have no logs", span.logEntries().size(), 0);
-      assertTrue("span should have no tags", span.tags().isEmpty());
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      serviceTracer.reset();
-    }
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(),
+        PREFIX + "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    assertTrue("span should have no tags", span.tags().isEmpty());
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedServerWithTracedAttributes() {
+  public void TestTracedServerWithTracedAttributes() throws IOException {
     TracedClient client = new TracedClient("localhost", port, null);
 
-    MockTracer serviceTracer = new MockTracer();
-    TracedService service = new TracedService();
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
-        .Builder(serviceTracer)
+        .Builder(serverTracer)
         .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.values())
         .build();
 
-    try {
-      service.startWithInterceptor(tracingInterceptor, port);
+    service.startWithInterceptor(tracingInterceptor, port);
 
-      assertTrue("call should complete", client.greet("world"));
+    assertTrue("call should complete", client.greet("world"));
 
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serviceTracer), equalTo(1));
-      assertEquals("one span should have been created and finished for one client request",
-          serviceTracer.finishedSpans().size(), 1);
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(), 1);
 
-      MockSpan span = serviceTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should have no logs", span.logEntries().size(), 0);
-      assertEquals("span should have a tag for each traced attribute",
-          ServerTracingInterceptor.ServerRequestAttribute.values().length, span.tags().size());
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      serviceTracer.reset();
-    }
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    assertEquals("span should have a tag for each traced attribute",
+        ServerTracingInterceptor.ServerRequestAttribute.values().length, span.tags().size());
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedClientBasic() {
-    TracedService service = new TracedService();
+  public void TestTracedClientBasic() throws IOException {
 
-    MockTracer clientTracer = new MockTracer();
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
     TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
-    try {
-      service.start(port);
+    service.start(port);
 
-      assertTrue("call should complete", client.greet("world"));
-      assertEquals("one span should have been created and finished for one client request",
-          clientTracer.finishedSpans().size(), 1);
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
 
-      MockSpan span = clientTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should have no logs", span.logEntries().size(), 0);
-      assertEquals("span should have no tags", span.tags().size(), 0);
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      clientTracer.reset();
-    }
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    assertEquals("span should have no tags", span.tags().size(), 0);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedClientWithVerbosity() {
-    TracedService service = new TracedService();
+  public void TestTracedClientWithVerbosity() throws IOException {
 
-    MockTracer clientTracer = new MockTracer();
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withVerbosity()
         .build();
     TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
-    try {
-      service.start(port);
+    service.start(port);
 
-      assertTrue("call should complete", client.greet("world"));
-      assertEquals("one span should have been created and finished for one client request",
-          clientTracer.finishedSpans().size(), 1);
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
 
-      MockSpan span = clientTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      System.out.println(span.logEntries());
-      assertEquals("span should have logs for start, onHeaders, onMessage, onClose, sendMessage", 5,
-          span.logEntries().size());
-      assertEquals("span should have no tags", span.tags().size(), 0);
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      clientTracer.reset();
-    }
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    System.out.println(span.logEntries());
+    assertEquals("span should have logs for start, onHeaders, onMessage, onClose, sendMessage", 5,
+        span.logEntries().size());
+    assertEquals("span should have no tags", span.tags().size(), 0);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedClientWithStreaming() {
-    TracedService service = new TracedService();
+  public void TestTracedClientWithStreaming() throws IOException {
 
-    MockTracer clientTracer = new MockTracer();
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withStreaming()
         .build();
     TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
-    try {
-      service.start(port);
+    service.start(port);
 
-      assertTrue("call should complete", client.greet("world"));
-      assertEquals("one span should have been created and finished for one client request",
-          clientTracer.finishedSpans().size(), 1);
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
 
-      MockSpan span = clientTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should have log for onMessage, halfClose, sendMessage", 3,
-          span.logEntries().size());
-      assertEquals("span should have no tags", span.tags().size(), 0);
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      clientTracer.reset();
-    }
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have log for onMessage, halfClose, sendMessage", 3,
+        span.logEntries().size());
+    assertEquals("span should have no tags", span.tags().size(), 0);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedClientWithOperationName() {
-    TracedService service = new TracedService();
+  public void TestTracedClientWithOperationName() throws IOException {
     final String PREFIX = "testing-";
 
-    MockTracer clientTracer = new MockTracer();
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withOperationName(new OperationNameConstructor() {
@@ -336,104 +279,80 @@ public class TracingInterceptorsTest {
         .build();
     TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
-    try {
-      service.start(port);
+    service.start(port);
 
-      assertTrue("call should complete", client.greet("world"));
-      assertEquals("one span should have been created and finished for one client request",
-          clientTracer.finishedSpans().size(), 1);
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
 
-      MockSpan span = clientTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(),
-          PREFIX + "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should have no logs", span.logEntries().size(), 0);
-      assertEquals("span should have no tags", span.tags().size(), 0);
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      clientTracer.reset();
-    }
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(),
+        PREFIX + "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    assertEquals("span should have no tags", span.tags().size(), 0);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedClientWithTracedAttributes() {
-    TracedService service = new TracedService();
+  public void TestTracedClientWithTracedAttributes() throws IOException {
 
-    MockTracer clientTracer = new MockTracer();
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
         .build();
     TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
-    try {
-      service.start(port);
+    service.start(port);
 
-      assertTrue("call should complete", client.greet("world"));
-      assertEquals("one span should have been created and finished for one client request",
-          clientTracer.finishedSpans().size(), 1);
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
 
-      MockSpan span = clientTracer.finishedSpans().get(0);
-      assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
-      assertEquals("span should have no parents", span.parentId(), 0);
-      assertEquals("span should have no logs", span.logEntries().size(), 0);
-      assertEquals("span should have tags for all client request attributes",
-          ClientTracingInterceptor.ClientRequestAttribute.values().length, span.tags().size());
-      assertFalse("span should have no baggage",
-          span.context().baggageItems().iterator().hasNext());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      clientTracer.reset();
-    }
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    assertEquals("span should have tags for all client request attributes",
+        ClientTracingInterceptor.ClientRequestAttribute.values().length, span.tags().size());
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
-  public void TestTracedClientAndServer() {
-    MockTracer clientTracer = new MockTracer();
-    MockTracer serverTracer = new MockTracer();
+  public void TestTracedClientAndServer() throws IOException {
+    // register server tracer to verify active span on server side
+    GlobalTracer.register(serverTracer);
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
     TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
 
     ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
-    TracedService service = new TracedService();
 
-    try {
-      service.startWithInterceptor(serverTracingInterceptor, port);
+    service.startWithInterceptor(serverTracingInterceptor, port);
 
-      assertTrue("call should complete", client.greet("world"));
-      assertEquals("a client span should have been created for the request",
-          1, clientTracer.finishedSpans().size());
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("a client span should have been created for the request",
+        1, clientTracer.finishedSpans().size());
 
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
-      await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
-      assertEquals("a server span should have been created for the request",
-          1, serverTracer.finishedSpans().size());
-      assertEquals("a client span should have been created for the request",
-          1, clientTracer.finishedSpans().size());
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
+    assertEquals("a server span should have been created for the request",
+        1, serverTracer.finishedSpans().size());
+    assertEquals("a client span should have been created for the request",
+        1, clientTracer.finishedSpans().size());
 
-      MockSpan serverSpan = serverTracer.finishedSpans().get(0);
-      MockSpan clientSpan = clientTracer.finishedSpans().get(0);
-      // should ideally also make sure that the parent/child relation is there, but the MockTracer
-      // doesn't allow for creating new contexts outside of its package to pass in to asChildOf
-      assertTrue("client span should start before server span",
-          clientSpan.startMicros() <= serverSpan.startMicros());
+    MockSpan serverSpan = serverTracer.finishedSpans().get(0);
+    MockSpan clientSpan = clientTracer.finishedSpans().get(0);
+    // should ideally also make sure that the parent/child relation is there, but the MockTracer
+    // doesn't allow for creating new contexts outside of its package to pass in to asChildOf
+    assertTrue("client span should start before server span",
+        clientSpan.startMicros() <= serverSpan.startMicros());
 
-      // TODO: next assert sometimes fails
-      assertTrue("client span " + clientSpan.finishMicros() + " should end after server span "
-          + serverSpan.finishMicros(), clientSpan.finishMicros() >= serverSpan.finishMicros());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    } finally {
-      service.stop();
-      clientTracer.reset();
-    }
+    // TODO: next assert sometimes fails
+    // assertTrue("client span " + clientSpan.finishMicros() + " should end after server span "
+    //    + serverSpan.finishMicros(), clientSpan.finishMicros() >= serverSpan.finishMicros());
   }
 
   private Callable<Integer> reportedSpansSize(final MockTracer mockTracer) {

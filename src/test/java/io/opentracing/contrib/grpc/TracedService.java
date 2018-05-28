@@ -19,7 +19,9 @@ import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
 import io.opentracing.contrib.grpc.gen.HelloReply;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
+import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
+
 
 public class TracedService {
 
@@ -39,7 +41,8 @@ public class TracedService {
     });
   }
 
-  void startWithInterceptor(ServerTracingInterceptor tracingInterceptor, int port) throws IOException {
+  void startWithInterceptor(ServerTracingInterceptor tracingInterceptor, int port)
+      throws IOException {
 
     server = ServerBuilder.forPort(port)
         .addService(tracingInterceptor.intercept(new GreeterImpl()))
@@ -69,6 +72,11 @@ public class TracedService {
 
     @Override
     public void sayHello(HelloRequest req, StreamObserver<HelloReply> responseObserver) {
+      // verify that there is an active span in case of using GlobalTracer:
+      if (GlobalTracer.isRegistered() && GlobalTracer.get().activeSpan() == null) {
+        throw new RuntimeException("no active span");
+      }
+
       HelloReply reply = HelloReply.newBuilder().setMessage("Hello").build();
       responseObserver.onNext(reply);
       responseObserver.onCompleted();
