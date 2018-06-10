@@ -1,4 +1,4 @@
-[![Build Status][ci-img]][ci] [![Released Version][maven-img]][maven]
+[![Build Status][ci-img]][ci] [![Coverage Status][cov-img]][cov] [![Released Version][maven-img]][maven]
 
 # OpenTracing gRPC Instrumentation
 OpenTracing instrumentation for gRPC.
@@ -251,6 +251,8 @@ blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel,
 
 [ci-img]: https://travis-ci.org/opentracing-contrib/java-grpc.svg?branch=master
 [ci]: https://travis-ci.org/opentracing-contrib/java-grpc
+[cov-img]: https://coveralls.io/repos/github/opentracing-contrib/java-grpc/badge.svg?branch=master
+[cov]: https://coveralls.io/github/opentracing-contrib/java-grpc?branch=master
 [maven-img]: https://img.shields.io/maven-central/v/io.opentracing.contrib/opentracing-grpc.svg
 [maven]: http://search.maven.org/#search%7Cga%7C1%7Copentracing-grpc        
         
