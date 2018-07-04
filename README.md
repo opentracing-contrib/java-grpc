@@ -104,6 +104,7 @@ A `ClientTracingInterceptor` also has default settings, which you can override b
 
 - `withOperationName(String operationName)`: Define how the operation name is constructed for all spans created for this intercepted client. Default is the name of the RPC method. More details in the `Operation Name` section.
 - `withActiveSpanSource(ActiveSpanSource activeSpanSource)`: Define how to extract the current active span, if any. This is needed if you want your client to continue a trace instead of starting a new one. More details in the `Active Span Source` section.
+- `withActiveSpanContextSource(ActiveSpanContextSource activeSpanContextSource)`: Define how to extract the current active span context, if any. This is needed if you want your client to continue a trace instead of starting a new one. More details in the `Active Span Source` section.
 - `withStreaming()`: Logs to the client span whenever a message is sent or a response is received. *Note:* This package supports streaming but has not been rigorously tested. If you come across any issues, please let us know.
 - `withVerbosity()`: Logs to the client span additional events, such as call started, message sent, half close (client finished sending messages), response received, and call complete. Default only logs if a call is cancelled.
 - `withTracedAttributes(ClientRequestAttribute... attrs)`: Sets tags on the client span in case you want to track information about the RPC call. See ClientRequestAttribute.java for a list of traceable request attributes.
@@ -230,6 +231,32 @@ We also provide two built-in implementations:
 
 - `ActiveSpanSource.GRPC_CONTEXT` uses the current `io.grpc.Context` and returns the active span for `OpenTracingContextKey`. This is the default active span source.
 - `ActiveSpanSource.NONE` always returns null as the active span, which means the client will always start a new trace
+
+## Active Span Context Sources
+
+Instead of `ActiveSpanSource` it's possible to use `ActiveSpanContextSource` if span is not available
+
+```java
+import io.opentracing.Span;
+
+    ClientTracingInterceptor interceptor = new ClientTracingInterceptor
+        .Builder(tracer)
+        ...
+        .withActiveSpanContextSource(new ActiveSpanContextSource() {
+            @Override
+            public Span getActiveSpanContext() {
+                return Context.get(OPENTRACING_SPAN_CONTEXT_KEY);
+            }
+        })
+        ...
+        .build();
+```
+
+We also provide two built-in implementations:
+
+- `ActiveSpanContextSource.GRPC_CONTEXT` uses the current `io.grpc.Context` and returns the active span context for `OpenTracingContextKey`.
+- `ActiveSpanContextSource.NONE` always returns null as the active span context, which means the client will always start a new trace
+
 
 ## Integrating with Other Interceptors
 Although we provide `ServerTracingInterceptor.intercept(service)` and `ClientTracingInterceptor.intercept(channel)` methods, you don't want to use these if you're chaining multiple interceptors. Instead, use the following code (preferably putting the tracing interceptor at the top of the interceptor stack so that it traces the entire request lifecycle, including other interceptors):

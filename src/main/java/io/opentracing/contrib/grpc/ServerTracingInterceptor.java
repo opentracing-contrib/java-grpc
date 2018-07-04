@@ -125,7 +125,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       }
     }
 
-    Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span);
+    Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
+        .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
     ServerCall.Listener<ReqT> listenerWithContext = Contexts
         .interceptCall(ctxWithSpan, call, headers, next);
 

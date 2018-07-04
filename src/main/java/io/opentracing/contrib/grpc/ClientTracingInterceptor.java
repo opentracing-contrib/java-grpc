@@ -25,6 +25,7 @@ import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.opentracing.Span;
+import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
@@ -47,6 +48,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   private final boolean verbose;
   private final Set<ClientRequestAttribute> tracedAttributes;
   private final ActiveSpanSource activeSpanSource;
+  private final ActiveSpanContextSource activeSpanContextSource;
 
   /**
    * @param tracer to use to trace requests
@@ -58,18 +60,20 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     this.verbose = false;
     this.tracedAttributes = new HashSet<ClientRequestAttribute>();
     this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
+    this.activeSpanContextSource = null;
   }
 
   private ClientTracingInterceptor(Tracer tracer, OperationNameConstructor operationNameConstructor,
       boolean streaming,
       boolean verbose, Set<ClientRequestAttribute> tracedAttributes,
-      ActiveSpanSource activeSpanSource) {
+      ActiveSpanSource activeSpanSource, ActiveSpanContextSource activeSpanContextSource) {
     this.tracer = tracer;
     this.operationNameConstructor = operationNameConstructor;
     this.streaming = streaming;
     this.verbose = verbose;
     this.tracedAttributes = tracedAttributes;
     this.activeSpanSource = activeSpanSource;
+    this.activeSpanContextSource = activeSpanContextSource;
   }
 
   /**
@@ -82,6 +86,19 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     return ClientInterceptors.intercept(channel, this);
   }
 
+  private SpanContext getActiveSpanContext() {
+    if (activeSpanSource != null) {
+      Span activeSpan = activeSpanSource.getActiveSpan();
+      if (activeSpan != null) {
+        return activeSpan.context();
+      }
+    }
+    if (activeSpanContextSource != null) {
+      return activeSpanContextSource.getActiveSpanContext();
+    }
+    return null;
+  }
+
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method,
@@ -90,8 +107,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   ) {
     final String operationName = operationNameConstructor.constructOperationName(method);
 
-    Span activeSpan = this.activeSpanSource.getActiveSpan();
-    final Span span = createSpanFromParent(activeSpan, operationName);
+    SpanContext activeSpanContext = getActiveSpanContext();
+    final Span span = createSpanFromParent(activeSpanContext, operationName);
 
     for (ClientRequestAttribute attr : this.tracedAttributes) {
       switch (attr) {
@@ -230,11 +247,11 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     };
   }
 
-  private Span createSpanFromParent(Span parentSpan, String operationName) {
-    if (parentSpan == null) {
+  private Span createSpanFromParent(SpanContext parentSpanContext, String operationName) {
+    if (parentSpanContext == null) {
       return tracer.buildSpan(operationName).start();
     } else {
-      return tracer.buildSpan(operationName).asChildOf(parentSpan).start();
+      return tracer.buildSpan(operationName).asChildOf(parentSpanContext).start();
     }
   }
 
@@ -249,6 +266,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     private boolean verbose;
     private Set<ClientRequestAttribute> tracedAttributes;
     private ActiveSpanSource activeSpanSource;
+    private ActiveSpanContextSource activeSpanContextSource;
 
     /**
      * @param tracer to use for this intercepter
@@ -315,11 +333,23 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
+     * @param activeSpanContextSource that provides a method of getting the
+     * active span context before the client call
+     * @return this Builder configured to start client span as children
+     * of the span context returned by activeSpanContextSource.getActiveSpanContext()
+     */
+    public Builder withActiveSpanContextSource(ActiveSpanContextSource activeSpanContextSource) {
+      this.activeSpanContextSource = activeSpanContextSource;
+      return this;
+    }
+
+    /**
      * @return a ClientTracingInterceptor with this Builder's configuration
      */
     public ClientTracingInterceptor build() {
       return new ClientTracingInterceptor(this.tracer, this.operationNameConstructor,
-          this.streaming, this.verbose, this.tracedAttributes, this.activeSpanSource);
+          this.streaming, this.verbose, this.tracedAttributes, this.activeSpanSource,
+          this.activeSpanContextSource);
     }
   }
 

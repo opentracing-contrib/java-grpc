@@ -14,31 +14,52 @@
 package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import io.grpc.Context;
+import io.grpc.Context.Key;
 import io.opentracing.Span;
-import io.opentracing.Tracer;
+import io.opentracing.SpanContext;
 import io.opentracing.mock.MockTracer;
+import org.junit.Before;
 import org.junit.Test;
 
 public class OpenTracingContextKeyTest {
 
-  Tracer tracer = new MockTracer();
+  private final MockTracer tracer = new MockTracer();
+
+  @Before
+  public void before() {
+    tracer.reset();
+  }
 
   @Test
-  public void TestGetKey() {
+  public void testGetKey() {
     Context.Key<Span> key = OpenTracingContextKey.getKey();
     assertEquals("Key should have correct name", key.toString(), (OpenTracingContextKey.KEY_NAME));
   }
 
   @Test
-  public void TestNoActiveSpan() {
-    assertEquals("activeSpan() should return null when no span is active",
-        OpenTracingContextKey.activeSpan(), null);
+  public void testGetSpanContextKey() {
+    Key<SpanContext> key = OpenTracingContextKey.getSpanContextKey();
+    assertEquals("Key should have correct name", key.toString(),
+        OpenTracingContextKey.KEY_CONTEXT_NAME);
   }
 
   @Test
-  public void TestGetActiveSpan() {
+  public void testNoActiveSpan() {
+    assertNull("activeSpan() should return null when no span is active",
+        OpenTracingContextKey.activeSpan());
+  }
+
+  @Test
+  public void testNoActiveSpanContext() {
+    assertNull("activeSpanContext() should return null when no span context is active",
+        OpenTracingContextKey.activeSpanContext());
+  }
+
+  @Test
+  public void testGetActiveSpan() {
     Span span = tracer.buildSpan("s0").start();
     Context ctx = Context.current().withValue(OpenTracingContextKey.getKey(), span);
     Context previousCtx = ctx.attach();
@@ -48,11 +69,26 @@ public class OpenTracingContextKeyTest {
     ctx.detach(previousCtx);
     span.finish();
 
-    assertEquals(OpenTracingContextKey.activeSpan(), null);
+    assertNull(OpenTracingContextKey.activeSpan());
   }
 
   @Test
-  public void TestMultipleContextLayers() {
+  public void testGetActiveSpanContext() {
+    Span span = tracer.buildSpan("s0").start();
+    Context ctx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
+        span.context());
+    Context previousCtx = ctx.attach();
+
+    assertEquals(OpenTracingContextKey.activeSpanContext(), span.context());
+
+    ctx.detach(previousCtx);
+    span.finish();
+
+    assertNull(OpenTracingContextKey.activeSpanContext());
+  }
+
+  @Test
+  public void testMultipleContextLayers() {
     Span parentSpan = tracer.buildSpan("s0").start();
     Context parentCtx = Context.current().withValue(OpenTracingContextKey.getKey(), parentSpan);
     Context previousCtx = parentCtx.attach();
@@ -71,11 +107,31 @@ public class OpenTracingContextKeyTest {
     parentCtx.detach(previousCtx);
     parentSpan.finish();
 
-    assertEquals(OpenTracingContextKey.activeSpan(), null);
+    assertNull(OpenTracingContextKey.activeSpan());
   }
 
   @Test
-  public void TestWrappedCall() {
+  public void testMultipleContextLayersForSpanContext() {
+    Span parentSpan = tracer.buildSpan("s0").start();
+    Context parentCtx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
+        parentSpan.context());
+    Context previousCtx = parentCtx.attach();
 
+    Span childSpan = tracer.buildSpan("s1").start();
+    Context childCtx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
+        childSpan.context());
+    parentCtx = childCtx.attach();
+
+    assertEquals(OpenTracingContextKey.activeSpanContext(), childSpan.context());
+
+    childCtx.detach(parentCtx);
+    childSpan.finish();
+
+    assertEquals(OpenTracingContextKey.activeSpanContext(), parentSpan.context());
+
+    parentCtx.detach(previousCtx);
+    parentSpan.finish();
+
+    assertNull(OpenTracingContextKey.activeSpanContext());
   }
 }
