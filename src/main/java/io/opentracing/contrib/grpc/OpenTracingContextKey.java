@@ -15,6 +15,7 @@ package io.opentracing.contrib.grpc;
 
 import io.grpc.Context;
 import io.opentracing.Span;
+import io.opentracing.SpanContext;
 
 /**
  * A {@link io.grpc.Context} key for the current OpenTracing trace state.
@@ -25,7 +26,9 @@ import io.opentracing.Span;
 public class OpenTracingContextKey {
 
   public static final String KEY_NAME = "io.opentracing.active-span";
+  public static final String KEY_CONTEXT_NAME = "io.opentracing.active-span-context";
   private static final Context.Key<Span> key = Context.key(KEY_NAME);
+  private static final Context.Key<SpanContext> keyContext = Context.key(KEY_CONTEXT_NAME);
 
   /**
    * @return the active span for the current request
@@ -39,5 +42,16 @@ public class OpenTracingContextKey {
    */
   public static Context.Key<Span> getKey() {
     return key;
+  }
+
+  /**
+   * @return the OpenTracing context key for span context
+   */
+  public static Context.Key<SpanContext> getSpanContextKey() {
+    return keyContext;
+  }
+
+  public static SpanContext activeSpanContext() {
+    return keyContext.get();
   }
 }
