@@ -276,6 +276,10 @@ blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel,
         someInterceptor, someOtherInterceptor, clientTracingInterceptor));
 ```
 
+## License
+
+[Apache 2.0 License](./LICENSE).
+
 [ci-img]: https://travis-ci.org/opentracing-contrib/java-grpc.svg?branch=master
 [ci]: https://travis-ci.org/opentracing-contrib/java-grpc
 [cov-img]: https://coveralls.io/repos/github/opentracing-contrib/java-grpc/badge.svg?branch=master
