@@ -203,7 +203,11 @@ public class ClientTracingInterceptor implements ClientInterceptor {
               if (status.getCode().value() == 0) {
                 span.log("Call closed");
               } else {
-                span.log(ImmutableMap.of("Call failed", status.getDescription()));
+                if (status.getDescription() == null) {
+                  span.log(ImmutableMap.of("Call failed", "null"));
+                } else {
+                  span.log(ImmutableMap.of("Call failed", status.getDescription()));
+                }
               }
             }
             span.finish();
