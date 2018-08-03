@@ -47,6 +47,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   private final boolean streaming;
   private final boolean verbose;
   private final Set<ServerRequestAttribute> tracedAttributes;
+  private final ServerSpanDecorator serverSpanDecorator;
 
   /**
    * @param tracer used to trace requests
@@ -57,16 +58,19 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     this.streaming = false;
     this.verbose = false;
     this.tracedAttributes = new HashSet<ServerRequestAttribute>();
+    this.serverSpanDecorator = new NoopServerSpanDecorator();
   }
 
   private ServerTracingInterceptor(Tracer tracer, OperationNameConstructor operationNameConstructor,
       boolean streaming,
-      boolean verbose, Set<ServerRequestAttribute> tracedAttributes) {
+      boolean verbose, Set<ServerRequestAttribute> tracedAttributes,
+      ServerSpanDecorator serverSpanDecorator) {
     this.tracer = tracer;
     this.operationNameConstructor = operationNameConstructor;
     this.streaming = streaming;
     this.verbose = verbose;
     this.tracedAttributes = tracedAttributes;
+    this.serverSpanDecorator = serverSpanDecorator;
   }
 
   /**
@@ -107,6 +111,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     final String operationName = operationNameConstructor
         .constructOperationName(call.getMethodDescriptor());
     final Span span = getSpanFromHeaders(headerMap, operationName);
+
+    serverSpanDecorator.interceptCall(span, call, headers);
 
     for (ServerRequestAttribute attr : this.tracedAttributes) {
       switch (attr) {
@@ -214,6 +220,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     private boolean streaming;
     private boolean verbose;
     private Set<ServerRequestAttribute> tracedAttributes;
+    private ServerSpanDecorator serverSpanDecorator;
 
     /**
      * @param tracer to use for this intercepter
@@ -225,6 +232,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<ServerRequestAttribute>();
+      this.serverSpanDecorator = new NoopServerSpanDecorator();
     }
 
     /**
@@ -267,11 +275,22 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
+     * Decorates the created span with custom data.
+     *
+     * @param serverSpanDecorator used to process the created span
+     * @return this Builder configured to decorate spans
+     */
+    public Builder withServerSpanDecorator(ServerSpanDecorator serverSpanDecorator) {
+      this.serverSpanDecorator = serverSpanDecorator;
+      return this;
+    }
+
+    /**
      * @return a ServerTracingInterceptor with this Builder's configuration
      */
     public ServerTracingInterceptor build() {
       return new ServerTracingInterceptor(this.tracer, this.operationNameConstructor,
-          this.streaming, this.verbose, this.tracedAttributes);
+          this.streaming, this.verbose, this.tracedAttributes, this.serverSpanDecorator);
     }
   }
 
