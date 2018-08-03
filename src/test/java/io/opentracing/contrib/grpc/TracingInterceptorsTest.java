@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import io.grpc.CallOptions;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.ServerCall;
@@ -365,6 +366,48 @@ public class TracingInterceptorsTest {
         ClientTracingInterceptor.ClientRequestAttribute.values().length, span.tags().size());
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void TestTracedClientWithClientSpanDecorator() throws IOException {
+    ClientSpanDecorator clientSpanDecorator = new ClientSpanDecorator() {
+      @Override
+      public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
+        span.setTag("test_tag", "test_value");
+        span.setTag("tag_from_method", method.getFullMethodName());
+        span.setTag("tag_from_call_options", callOptions.getCompressor());
+
+        span.log("A test log");
+      }
+    };
+
+    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+            .Builder(clientTracer)
+            .withClientSpanDecorator(clientSpanDecorator)
+            .build();
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+
+    service.start(port);
+
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+            clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have one log from the decorator",
+            span.logEntries().size(), 1);
+    assertEquals("span should have 3 tags from the decorator",
+            3, span.tags().size());
+    assertEquals("span contains the test_tag tag", "test_value",
+            span.tags().get("test_tag"));
+    assertTrue("span contains the tag_from_call tag",
+            span.tags().containsKey("tag_from_method"));
+    assertTrue("span contains the tag_from_headers tag",
+            span.tags().containsKey("tag_from_call_options"));
+    assertFalse("span should have no baggage",
+            span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
