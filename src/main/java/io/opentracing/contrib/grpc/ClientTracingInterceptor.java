@@ -49,6 +49,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   private final Set<ClientRequestAttribute> tracedAttributes;
   private final ActiveSpanSource activeSpanSource;
   private final ActiveSpanContextSource activeSpanContextSource;
+  private final ClientSpanDecorator clientSpanDecorator;
 
   /**
    * @param tracer to use to trace requests
@@ -61,12 +62,14 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     this.tracedAttributes = new HashSet<ClientRequestAttribute>();
     this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
     this.activeSpanContextSource = null;
+    this.clientSpanDecorator = new NoopClientSpanDecorator();
   }
 
   private ClientTracingInterceptor(Tracer tracer, OperationNameConstructor operationNameConstructor,
       boolean streaming,
       boolean verbose, Set<ClientRequestAttribute> tracedAttributes,
-      ActiveSpanSource activeSpanSource, ActiveSpanContextSource activeSpanContextSource) {
+      ActiveSpanSource activeSpanSource, ActiveSpanContextSource activeSpanContextSource,
+      ClientSpanDecorator clientSpanDecorator) {
     this.tracer = tracer;
     this.operationNameConstructor = operationNameConstructor;
     this.streaming = streaming;
@@ -74,6 +77,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     this.tracedAttributes = tracedAttributes;
     this.activeSpanSource = activeSpanSource;
     this.activeSpanContextSource = activeSpanContextSource;
+    this.clientSpanDecorator = clientSpanDecorator;
   }
 
   /**
@@ -109,6 +113,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
     SpanContext activeSpanContext = getActiveSpanContext();
     final Span span = createSpanFromParent(activeSpanContext, operationName);
+
+    clientSpanDecorator.interceptCall(span, method, callOptions);
 
     for (ClientRequestAttribute attr : this.tracedAttributes) {
       switch (attr) {
@@ -271,6 +277,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     private Set<ClientRequestAttribute> tracedAttributes;
     private ActiveSpanSource activeSpanSource;
     private ActiveSpanContextSource activeSpanContextSource;
+    private ClientSpanDecorator clientSpanDecorator;
 
     /**
      * @param tracer to use for this intercepter
@@ -283,6 +290,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       this.verbose = false;
       this.tracedAttributes = new HashSet<ClientRequestAttribute>();
       this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
+      this.clientSpanDecorator = new NoopClientSpanDecorator();
     }
 
     /**
@@ -348,12 +356,23 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
+     * Decorates the client span with custom data
+     *
+     * @param clientSpanDecorator used to decorate the client span
+     * @return this builder configured to decorate the client span
+     */
+    public Builder withClientSpanDecorator(ClientSpanDecorator clientSpanDecorator) {
+      this.clientSpanDecorator = clientSpanDecorator;
+      return this;
+    }
+
+    /**
      * @return a ClientTracingInterceptor with this Builder's configuration
      */
     public ClientTracingInterceptor build() {
       return new ClientTracingInterceptor(this.tracer, this.operationNameConstructor,
           this.streaming, this.verbose, this.tracedAttributes, this.activeSpanSource,
-          this.activeSpanContextSource);
+          this.activeSpanContextSource, this.clientSpanDecorator);
     }
   }
 
@@ -365,5 +384,10 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     AUTHORITY,
     ALL_CALL_OPTIONS,
     HEADERS
+  }
+
+  private static class NoopClientSpanDecorator implements ClientSpanDecorator {
+    @Override
+    public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {}
   }
 }

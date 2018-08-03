@@ -275,10 +275,10 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
-     * Decorates the created span with custom data.
+     * Decorates the server span with custom data.
      *
-     * @param serverSpanDecorator used to process the created span
-     * @return this Builder configured to decorate spans
+     * @param serverSpanDecorator used to decorate the server span
+     * @return this Builder configured to decorate server span
      */
     public Builder withServerSpanDecorator(ServerSpanDecorator serverSpanDecorator) {
       this.serverSpanDecorator = serverSpanDecorator;
@@ -299,5 +299,10 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     METHOD_TYPE,
     METHOD_NAME,
     CALL_ATTRIBUTES
+  }
+
+  private static class NoopServerSpanDecorator implements ServerSpanDecorator {
+    @Override
+    public void interceptCall(Span span, ServerCall call, Metadata headers) {}
   }
 }    
