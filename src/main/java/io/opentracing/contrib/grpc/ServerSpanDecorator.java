@@ -6,7 +6,7 @@ import io.grpc.ServerCallHandler;
 import io.opentracing.Span;
 
 /**
- * An interface for adding custom span tags and logs to the spans created by
+ * An interface for adding custom span tags to the spans created by
  * {@link ServerTracingInterceptor}
  */
 public interface ServerSpanDecorator {
