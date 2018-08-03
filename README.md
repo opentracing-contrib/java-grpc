@@ -257,6 +257,38 @@ We also provide two built-in implementations:
 - `ActiveSpanContextSource.GRPC_CONTEXT` uses the current `io.grpc.Context` and returns the active span context for `OpenTracingContextKey`.
 - `ActiveSpanContextSource.NONE` always returns null as the active span context, which means the client will always start a new trace
 
+## Custom Span Decorators
+
+If you want to add custom tags or logs to the server and client spans, then you can implement the 
+`ClientSpanDecorator` and `ServerSpanDecorator` interfaces.
+
+```java
+ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor
+    .Builder(tracer)
+    ...
+    .withClientSpanDecorator(new ClientSpanDecorator() {
+        @Override
+        public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
+            span.setTag("some_tag", "some_value");
+            span.log("Example log");
+        }
+    })
+    ...
+    .build();
+    
+ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor
+    .Builder(tracer)
+    ...
+    .withServerSpanDecorator(new ServerSpanDecorator(){
+        @Override
+        public void interceptCall(Span span, ServerCall call, Metadata headers) {
+            span.setTag("some_tag", "some_value");
+            span.log("Example log");
+        }
+    })
+    ...
+    .build();
+```
 
 ## Integrating with Other Interceptors
 Although we provide `ServerTracingInterceptor.intercept(service)` and `ClientTracingInterceptor.intercept(channel)` methods, you don't want to use these if you're chaining multiple interceptors. Instead, use the following code (preferably putting the tracing interceptor at the top of the interceptor stack so that it traces the entire request lifecycle, including other interceptors):
