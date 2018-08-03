@@ -19,7 +19,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import io.grpc.CallOptions;
+import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
+import io.grpc.ServerCall;
+import io.opentracing.Span;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
 import io.opentracing.util.GlobalTracer;
@@ -193,6 +197,50 @@ public class TracingInterceptorsTest {
   }
 
   @Test
+  public void TestTracedServerWithServerSpanDecorator() throws IOException {
+    TracedClient client = new TracedClient("localhost", port, null);
+    ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
+      @Override
+      public void interceptCall(Span span, ServerCall call, Metadata headers) {
+        span.setTag("test_tag", "test_value");
+        span.setTag("tag_from_call", call.getAuthority());
+        span.setTag("tag_from_headers", headers.toString());
+
+        span.log("A test log");
+      }
+    };
+
+    ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
+            .Builder(serverTracer)
+            .withServerSpanDecorator(serverSpanDecorator)
+            .build();
+
+    service.startWithInterceptor(tracingInterceptor, port);
+
+    assertTrue("call should complete", client.greet("world"));
+
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+            serverTracer.finishedSpans().size(), 1);
+
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have one log added in the decorator",
+            span.logEntries().size(), 1);
+    assertEquals("span should have 3 tags added in the decorator",
+            3, span.tags().size());
+    assertEquals("span contains the test_tag tag", "test_value",
+            span.tags().get("test_tag"));
+    assertTrue("span contains the tag_from_call tag",
+            span.tags().containsKey("tag_from_call"));
+    assertTrue("span contains the tag_from_headers tag",
+            span.tags().containsKey("tag_from_headers"));
+    assertFalse("span should have no baggage",
+            span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
   public void TestTracedClientBasic() throws IOException {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
@@ -318,6 +366,48 @@ public class TracingInterceptorsTest {
         ClientTracingInterceptor.ClientRequestAttribute.values().length, span.tags().size());
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void TestTracedClientWithClientSpanDecorator() throws IOException {
+    ClientSpanDecorator clientSpanDecorator = new ClientSpanDecorator() {
+      @Override
+      public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
+        span.setTag("test_tag", "test_value");
+        span.setTag("tag_from_method", method.getFullMethodName());
+        span.setTag("tag_from_call_options", callOptions.getCompressor());
+
+        span.log("A test log");
+      }
+    };
+
+    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+            .Builder(clientTracer)
+            .withClientSpanDecorator(clientSpanDecorator)
+            .build();
+    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+
+    service.start(port);
+
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+            clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have one log from the decorator",
+            span.logEntries().size(), 1);
+    assertEquals("span should have 3 tags from the decorator",
+            3, span.tags().size());
+    assertEquals("span contains the test_tag tag", "test_value",
+            span.tags().get("test_tag"));
+    assertTrue("span contains the tag_from_call tag",
+            span.tags().containsKey("tag_from_method"));
+    assertTrue("span contains the tag_from_headers tag",
+            span.tags().containsKey("tag_from_call_options"));
+    assertFalse("span should have no baggage",
+            span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
