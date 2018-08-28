@@ -30,6 +30,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapExtractAdapter;
+import io.opentracing.util.GlobalTracer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +49,13 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   private final boolean verbose;
   private final Set<ServerRequestAttribute> tracedAttributes;
   private final ServerSpanDecorator serverSpanDecorator;
+
+  /**
+   * Instantiate interceptor using GlobalTracer to get tracer
+   */
+  public ServerTracingInterceptor() {
+    this(GlobalTracer.get());
+  }
 
   /**
    * @param tracer used to trace requests
@@ -223,6 +231,13 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     private ServerSpanDecorator serverSpanDecorator;
 
     /**
+     * Creates a Builder using GlobalTracer to get tracer
+     */
+    public Builder() {
+      this(GlobalTracer.get());
+    }
+
+    /**
      * @param tracer to use for this intercepter
      * Creates a Builder with default configuration
      */
@@ -303,6 +318,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
   private static class NoopServerSpanDecorator implements ServerSpanDecorator {
     @Override
-    public void interceptCall(Span span, ServerCall call, Metadata headers) {}
+    public void interceptCall(Span span, ServerCall call, Metadata headers) {
+    }
   }
 }    

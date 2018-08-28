@@ -19,6 +19,7 @@ pom.xml
 ### Server
 
 - Instantiate tracer
+- Optionally register tracer with GlobalTracer: `GlobalTracer.register(tracer)`
 - Create a `ServerTracingInterceptor`
 - Intercept a service
 
@@ -33,6 +34,9 @@ import io.opentracing.Tracer;
 
         private void start() throws IOException {
             ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(this.tracer);
+            
+            // If GlobalTracer is used: 
+            // ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor();
 
             server = ServerBuilder.forPort(port)
                 .addService(tracingInterceptor.intercept(someServiceDef))
@@ -45,6 +49,7 @@ import io.opentracing.Tracer;
 ### Client
 
 - Instantiate a tracer
+- Optionally register tracer with GlobalTracer: `GlobalTracer.register(tracer)`
 - Create a `ClientTracingInterceptor`
 - Intercept the client channel
 
@@ -64,6 +69,9 @@ import io.opentracing.Tracer;
                 .build();
 
             ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(this.tracer);
+            
+            // If GlobalTracer is used: 
+            // ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor();
 
             blockingStub = GreeterGrpc.newBlockingStub(tracingInterceptor.intercept(channel));
         }
