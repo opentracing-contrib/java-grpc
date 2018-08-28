@@ -29,6 +29,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
+import io.opentracing.util.GlobalTracer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -50,6 +51,13 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   private final ActiveSpanSource activeSpanSource;
   private final ActiveSpanContextSource activeSpanContextSource;
   private final ClientSpanDecorator clientSpanDecorator;
+
+  /**
+   * Instantiate interceptor using GlobalTracer to get tracer
+   */
+  public ClientTracingInterceptor() {
+    this(GlobalTracer.get());
+  }
 
   /**
    * @param tracer to use to trace requests
@@ -270,7 +278,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
    */
   public static class Builder {
 
-    private Tracer tracer;
+    private final Tracer tracer;
     private OperationNameConstructor operationNameConstructor;
     private boolean streaming;
     private boolean verbose;
@@ -278,6 +286,13 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     private ActiveSpanSource activeSpanSource;
     private ActiveSpanContextSource activeSpanContextSource;
     private ClientSpanDecorator clientSpanDecorator;
+
+    /**
+     * Creates a Builder using GlobalTracer to get tracer
+     */
+    public Builder() {
+      this(GlobalTracer.get());
+    }
 
     /**
      * @param tracer to use for this intercepter
@@ -388,6 +403,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
   private static class NoopClientSpanDecorator implements ClientSpanDecorator {
     @Override
-    public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {}
+    public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
+    }
   }
 }
