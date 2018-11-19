@@ -14,6 +14,7 @@
 package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import io.grpc.Context;
 import io.opentracing.Span;
@@ -28,13 +29,13 @@ public class ActiveSpanSourceTest {
   @Test
   public void TestDefaultNone() {
     ActiveSpanSource ss = ActiveSpanSource.NONE;
-    assertEquals("active span should always be null", ss.getActiveSpan(), null);
+    assertNull("active span should always be null", ss.getActiveSpan());
 
     Span span = tracer.buildSpan("s0").start();
     Context ctx = Context.current().withValue(OpenTracingContextKey.getKey(), span);
     Context previousCtx = ctx.attach();
 
-    assertEquals("active span should always be null", ss.getActiveSpan(), null);
+    assertNull("active span should always be null", ss.getActiveSpan());
 
     ctx.detach(previousCtx);
     span.finish();
@@ -43,8 +44,7 @@ public class ActiveSpanSourceTest {
   @Test
   public void TestDefaultGrpc() {
     ActiveSpanSource ss = ActiveSpanSource.GRPC_CONTEXT;
-    assertEquals("active span should be null, no span in OpenTracingContextKey", ss.getActiveSpan(),
-        null);
+    assertNull("active span should be null, no span in OpenTracingContextKey", ss.getActiveSpan());
 
     Span span = tracer.buildSpan("s0").start();
     Context ctx = Context.current().withValue(OpenTracingContextKey.getKey(), span);
@@ -56,8 +56,7 @@ public class ActiveSpanSourceTest {
     ctx.detach(previousCtx);
     span.finish();
 
-    assertEquals("active span should be null, no span in OpenTracingContextKey", ss.getActiveSpan(),
-        null);
+    assertNull("active span should be null, no span in OpenTracingContextKey", ss.getActiveSpan());
   }
 
 }
