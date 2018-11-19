@@ -65,7 +65,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     this.operationNameConstructor = OperationNameConstructor.DEFAULT;
     this.streaming = false;
     this.verbose = false;
-    this.tracedAttributes = new HashSet<ServerRequestAttribute>();
+    this.tracedAttributes = new HashSet<>();
     this.serverSpanDecorator = new NoopServerSpanDecorator();
   }
 
@@ -107,7 +107,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       Metadata headers,
       ServerCallHandler<ReqT, RespT> next
   ) {
-    Map<String, String> headerMap = new HashMap<String, String>();
+    Map<String, String> headerMap = new HashMap<>();
     for (String key : headers.keys()) {
       if (!key.endsWith(Metadata.BINARY_HEADER_SUFFIX)) {
         String value = headers.get(Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER));
@@ -152,11 +152,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         if (streaming || verbose) {
           span.log(ImmutableMap.of("Message received", message));
         }
-        Scope scope = tracer.scopeManager().activate(span, false);
-        try {
+        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
           delegate().onMessage(message);
-        } finally {
-          scope.close();
         }
       }
 
@@ -165,23 +162,17 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         if (streaming) {
           span.log("Client finished sending messages");
         }
-        Scope scope = tracer.scopeManager().activate(span, false);
-        try {
+        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
           delegate().onHalfClose();
-        } finally {
-          scope.close();
         }
 
       }
 
       @Override
       public void onCancel() {
-        Scope scope = tracer.scopeManager().activate(span, true);
-        span.log("Call cancelled");
-        try {
+        try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+          span.log("Call cancelled");
           delegate().onCancel();
-        } finally {
-          scope.close();
         }
       }
 
@@ -190,11 +181,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         if (verbose) {
           span.log("Call completed");
         }
-        Scope scope = tracer.scopeManager().activate(span, true);
-        try {
+        try (Scope ignored = tracer.scopeManager().activate(span, true)) {
           delegate().onComplete();
-        } finally {
-          scope.close();
         }
       }
     };
@@ -246,7 +234,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
-      this.tracedAttributes = new HashSet<ServerRequestAttribute>();
+      this.tracedAttributes = new HashSet<>();
       this.serverSpanDecorator = new NoopServerSpanDecorator();
     }
 
@@ -265,7 +253,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
      * @return this Builder configured to trace request attributes
      */
     public Builder withTracedAttributes(ServerRequestAttribute... attributes) {
-      this.tracedAttributes = new HashSet<ServerRequestAttribute>(Arrays.asList(attributes));
+      this.tracedAttributes = new HashSet<>(Arrays.asList(attributes));
       return this;
     }
 

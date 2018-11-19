@@ -67,7 +67,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     this.operationNameConstructor = OperationNameConstructor.DEFAULT;
     this.streaming = false;
     this.verbose = false;
-    this.tracedAttributes = new HashSet<ClientRequestAttribute>();
+    this.tracedAttributes = new HashSet<>();
     this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
     this.activeSpanContextSource = null;
     this.clientSpanDecorator = new NoopClientSpanDecorator();
@@ -303,7 +303,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
-      this.tracedAttributes = new HashSet<ClientRequestAttribute>();
+      this.tracedAttributes = new HashSet<>();
       this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
       this.clientSpanDecorator = new NoopClientSpanDecorator();
     }
@@ -333,8 +333,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
      * @return this Builder configured to trace attributes
      */
     public Builder withTracedAttributes(ClientRequestAttribute... tracedAttributes) {
-      this.tracedAttributes = new HashSet<ClientRequestAttribute>(
-          Arrays.asList(tracedAttributes));
+      this.tracedAttributes = new HashSet<>(Arrays.asList(tracedAttributes));
       return this;
     }
 

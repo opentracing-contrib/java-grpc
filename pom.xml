@@ -55,11 +55,12 @@
   </issueManagement>
 
   <properties>
-    <java.version>1.6</java.version>
+    <java.version>1.7</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 
-    <grpc.version>1.12.0</grpc.version>
+    <grpc.version>1.15.0</grpc.version>
+    <protobuf.version>3.5.1</protobuf.version>
     <opentracing.version>0.31.0</opentracing.version>
     <coveralls-maven-plugin.version>4.3.0</coveralls-maven-plugin.version>
     <jacoco-maven-plugin.version>0.8.1</jacoco-maven-plugin.version>
@@ -144,6 +145,13 @@
   </dependencies>
 
   <build>
+    <extensions>
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>1.6.0</version>
+      </extension>
+    </extensions>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -224,6 +232,30 @@
             <id>prepare-agent</id>
             <goals>
               <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <version>0.6.1</version>
+        <configuration>
+          <protocArtifact>
+            com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+          </protocArtifact>
+          <pluginId>grpc-java</pluginId>
+          <pluginArtifact>
+            io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}
+          </pluginArtifact>
+        </configuration>
+        <executions>
+          <execution>
+            <id>proto-test-compile</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>test-compile</goal>
+              <goal>test-compile-custom</goal>
             </goals>
           </execution>
         </executions>
