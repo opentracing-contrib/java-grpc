@@ -14,29 +14,19 @@
 package io.opentracing.contrib.grpc;
 
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
 
 public class TracedClient {
 
-  private final ManagedChannel channel;
   private final GreeterGrpc.GreeterBlockingStub blockingStub;
 
-  public TracedClient(String host, int port, ClientTracingInterceptor tracingInterceptor) {
-    channel = ManagedChannelBuilder.forAddress(host, port)
-        .usePlaintext()
-        .build();
-
+  public TracedClient(ManagedChannel channel, ClientTracingInterceptor tracingInterceptor) {
     if (tracingInterceptor == null) {
       blockingStub = GreeterGrpc.newBlockingStub(channel);
     } else {
       blockingStub = GreeterGrpc.newBlockingStub(tracingInterceptor.intercept(channel));
     }
-  }
-
-  void shutdown() throws InterruptedException {
-    channel.shutdown();
   }
 
   boolean greet(String name) {
@@ -45,14 +35,7 @@ public class TracedClient {
       blockingStub.sayHello(request);
     } catch (Exception e) {
       return false;
-    } finally {
-      try {
-        this.shutdown();
-      } catch (Exception e) {
-        return false;
-      }
     }
     return true;
-
   }
 }
