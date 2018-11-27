@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import io.grpc.BindableService;
 import io.grpc.Context;
 import io.grpc.Contexts;
+import io.grpc.ForwardingServerCall;
 import io.grpc.ForwardingServerCallListener;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
@@ -24,6 +25,7 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
 import io.grpc.ServerServiceDefinition;
+import io.grpc.Status;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
@@ -38,7 +40,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * An intercepter that applies tracing via OpenTracing to all requests
+ * An interceptor that applies tracing via OpenTracing to all requests
  * to the server.
  */
 public class ServerTracingInterceptor implements ServerInterceptor {
@@ -49,6 +51,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   private final boolean verbose;
   private final Set<ServerRequestAttribute> tracedAttributes;
   private final ServerSpanDecorator serverSpanDecorator;
+  private final ServerCloseDecorator serverCloseDecorator;
 
   /**
    * Instantiate interceptor using GlobalTracer to get tracer
@@ -66,19 +69,22 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     this.streaming = false;
     this.verbose = false;
     this.tracedAttributes = new HashSet<>();
-    this.serverSpanDecorator = new NoopServerSpanDecorator();
+    this.serverSpanDecorator = null;
+    this.serverCloseDecorator = null;
   }
 
   private ServerTracingInterceptor(Tracer tracer, OperationNameConstructor operationNameConstructor,
       boolean streaming,
       boolean verbose, Set<ServerRequestAttribute> tracedAttributes,
-      ServerSpanDecorator serverSpanDecorator) {
+      ServerSpanDecorator serverSpanDecorator,
+      ServerCloseDecorator serverCloseDecorator) {
     this.tracer = tracer;
     this.operationNameConstructor = operationNameConstructor;
     this.streaming = streaming;
     this.verbose = verbose;
     this.tracedAttributes = tracedAttributes;
     this.serverSpanDecorator = serverSpanDecorator;
+    this.serverCloseDecorator = serverCloseDecorator;
   }
 
   /**
@@ -107,20 +113,22 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       Metadata headers,
       ServerCallHandler<ReqT, RespT> next
   ) {
-    Map<String, String> headerMap = new HashMap<>();
-    for (String key : headers.keys()) {
+    final Set<String> headerKeys = headers.keys();
+    Map<String, String> headerMap = new HashMap<>(headerKeys.size());
+    for (String key : headerKeys) {
       if (!key.endsWith(Metadata.BINARY_HEADER_SUFFIX)) {
         String value = headers.get(Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER));
         headerMap.put(key, value);
       }
-
     }
 
     final String operationName = operationNameConstructor
         .constructOperationName(call.getMethodDescriptor());
     final Span span = getSpanFromHeaders(headerMap, operationName);
 
-    serverSpanDecorator.interceptCall(span, call, headers);
+    if (serverSpanDecorator != null) {
+      serverSpanDecorator.interceptCall(span, call, headers);
+    }
 
     for (ServerRequestAttribute attr : this.tracedAttributes) {
       switch (attr) {
@@ -141,8 +149,21 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
         .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
+    final ServerCall<ReqT, RespT> maybeDecoratedCall;
+    if (serverCloseDecorator != null) {
+      maybeDecoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
+        @Override
+        public void close(Status status, Metadata trailers) {
+          serverCloseDecorator.close(span, status, trailers);
+          super.close(status, trailers);
+        }
+      };
+    } else {
+      // No decorator defined for server close - don't wrap call unnecessarily
+      maybeDecoratedCall = call;
+    }
     ServerCall.Listener<ReqT> listenerWithContext = Contexts
-        .interceptCall(ctxWithSpan, call, headers, next);
+        .interceptCall(ctxWithSpan, maybeDecoratedCall, headers, next);
 
     return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
         listenerWithContext) {
@@ -217,6 +238,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     private boolean verbose;
     private Set<ServerRequestAttribute> tracedAttributes;
     private ServerSpanDecorator serverSpanDecorator;
+    private ServerCloseDecorator serverCloseDecorator;
 
     /**
      * Creates a Builder using GlobalTracer to get tracer
@@ -226,7 +248,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
-     * @param tracer to use for this intercepter
+     * @param tracer to use for this interceptor
      * Creates a Builder with default configuration
      */
     public Builder(Tracer tracer) {
@@ -235,11 +257,10 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
-      this.serverSpanDecorator = new NoopServerSpanDecorator();
     }
 
     /**
-     * @param operationNameConstructor for all spans created by this intercepter
+     * @param operationNameConstructor for all spans created by this interceptor
      * @return this Builder with configured operation name
      */
     public Builder withOperationName(OperationNameConstructor operationNameConstructor) {
@@ -249,7 +270,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     /**
      * @param attributes to set as tags on server spans
-     * created by this intercepter
+     * created by this interceptor
      * @return this Builder configured to trace request attributes
      */
     public Builder withTracedAttributes(ServerRequestAttribute... attributes) {
@@ -289,11 +310,22 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
+     * Decorates the server span with custom data when the gRPC call is closed.
+     * @param serverCloseDecorator used to decorate the server span
+     * @return this Builder configured to decorate server span when the gRPC call is closed
+     */
+    public Builder withServerCloseDecorator(ServerCloseDecorator serverCloseDecorator) {
+      this.serverCloseDecorator = serverCloseDecorator;
+      return this;
+    }
+
+    /**
      * @return a ServerTracingInterceptor with this Builder's configuration
      */
     public ServerTracingInterceptor build() {
       return new ServerTracingInterceptor(this.tracer, this.operationNameConstructor,
-          this.streaming, this.verbose, this.tracedAttributes, this.serverSpanDecorator);
+          this.streaming, this.verbose, this.tracedAttributes, this.serverSpanDecorator,
+          this.serverCloseDecorator);
     }
   }
 
@@ -304,9 +336,4 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     CALL_ATTRIBUTES
   }
 
-  private static class NoopServerSpanDecorator implements ServerSpanDecorator {
-    @Override
-    public void interceptCall(Span span, ServerCall call, Metadata headers) {
-    }
-  }
-}    
+}

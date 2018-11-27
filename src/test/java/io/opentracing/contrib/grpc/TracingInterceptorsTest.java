@@ -23,48 +23,47 @@ import io.grpc.CallOptions;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.ServerCall;
+import io.grpc.Status;
+import io.grpc.testing.GrpcServerRule;
 import io.opentracing.Span;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
+import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import io.opentracing.util.GlobalTracerTestUtil;
-import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import org.junit.After;
+import org.assertj.core.api.Assertions;
+import org.assertj.core.data.MapEntry;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class TracingInterceptorsTest {
 
-  private int port = 50050;
   private final MockTracer clientTracer = new MockTracer();
   private final MockTracer serverTracer = new MockTracer();
+
+  @Rule
+  public GrpcServerRule grpcServer = new GrpcServerRule();
+
   private TracedService service;
 
   @Before
   public void before() {
-    port++;
     GlobalTracerTestUtil.resetGlobalTracer();
     clientTracer.reset();
     serverTracer.reset();
     service = new TracedService();
   }
 
-  @After
-  public void after() {
-    if (service != null) {
-      service.stop();
-    }
-  }
-
   @Test
-  public void TestTracedServerBasic() throws IOException {
-    TracedClient client = new TracedClient("localhost", port, null);
+  public void TestTracedServerBasic() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.startWithInterceptor(tracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -83,15 +82,15 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithVerbosity() throws IOException {
-    TracedClient client = new TracedClient("localhost", port, null);
+  public void TestTracedServerWithVerbosity() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withVerbosity()
         .build();
 
-    service.startWithInterceptor(tracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -110,15 +109,15 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithStreaming() throws IOException {
-    TracedClient client = new TracedClient("localhost", port, null);
+  public void TestTracedServerWithStreaming() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withStreaming()
         .build();
 
-    service.startWithInterceptor(tracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -137,9 +136,9 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithCustomOperationName() throws IOException {
+  public void TestTracedServerWithCustomOperationName() {
     final String PREFIX = "testing-";
-    TracedClient client = new TracedClient("localhost", port, null);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -151,7 +150,7 @@ public class TracingInterceptorsTest {
         })
         .build();
 
-    service.startWithInterceptor(tracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -170,15 +169,15 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithTracedAttributes() throws IOException {
-    TracedClient client = new TracedClient("localhost", port, null);
+  public void TestTracedServerWithTracedAttributes() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.values())
         .build();
 
-    service.startWithInterceptor(tracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -197,8 +196,8 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithServerSpanDecorator() throws IOException {
-    TracedClient client = new TracedClient("localhost", port, null);
+  public void TestTracedServerWithServerSpanDecorator() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
     ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
       @Override
       public void interceptCall(Span span, ServerCall call, Metadata headers) {
@@ -215,7 +214,7 @@ public class TracingInterceptorsTest {
             .withServerSpanDecorator(serverSpanDecorator)
             .build();
 
-    service.startWithInterceptor(tracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -241,12 +240,42 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientBasic() throws IOException {
+  public void TestTracedServerWithServerCloseDecorator() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
+      @Override
+      public void close(Span span, Status status, Metadata trailers) {
+        span.setTag("grpc.status", status.getCode().name());
+        Tags.ERROR.set(span, !status.isOk());
+      }
+    };
+
+    ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
+            .Builder(serverTracer)
+            .withServerCloseDecorator(serverCloseDecorator)
+            .build();
+
+    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+
+    assertTrue("call should complete", client.greet("world"));
+
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+            serverTracer.finishedSpans().size(), 1);
+
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    Assertions.assertThat(span.tags())
+            .contains(MapEntry.entry("grpc.status", "OK"))
+            .contains(MapEntry.entry("error", false));
+  }
+
+  @Test
+  public void TestTracedClientBasic() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
-    service.start(port);
+    service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
@@ -262,15 +291,15 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithVerbosity() throws IOException {
+  public void TestTracedClientWithVerbosity() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withVerbosity()
         .build();
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
-    service.start(port);
+    service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
@@ -288,15 +317,15 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithStreaming() throws IOException {
+  public void TestTracedClientWithStreaming() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withStreaming()
         .build();
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
-    service.start(port);
+    service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
@@ -313,7 +342,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithOperationName() throws IOException {
+  public void TestTracedClientWithOperationName() {
     final String PREFIX = "testing-";
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
@@ -325,9 +354,9 @@ public class TracingInterceptorsTest {
           }
         })
         .build();
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
-    service.start(port);
+    service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
@@ -344,15 +373,15 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithTracedAttributes() throws IOException {
+  public void TestTracedClientWithTracedAttributes() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
         .build();
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
-    service.start(port);
+    service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
@@ -369,7 +398,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithClientSpanDecorator() throws IOException {
+  public void TestTracedClientWithClientSpanDecorator() {
     ClientSpanDecorator clientSpanDecorator = new ClientSpanDecorator() {
       @Override
       public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
@@ -385,9 +414,9 @@ public class TracingInterceptorsTest {
             .Builder(clientTracer)
             .withClientSpanDecorator(clientSpanDecorator)
             .build();
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
-    service.start(port);
+    service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
@@ -411,16 +440,44 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientAndServer() throws IOException {
+  public void TestTracedClientWithClientCloseDecorator() {
+    ClientCloseDecorator clientCloseDecorator = new ClientCloseDecorator() {
+      @Override
+      public void close(Span span, Status status, Metadata trailers) {
+        span.setTag("grpc.status", status.getCode().name());
+        Tags.ERROR.set(span, !status.isOk());
+      }
+    };
+
+    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+            .Builder(clientTracer)
+            .withClientCloseDecorator(clientCloseDecorator)
+            .build();
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
+
+    service.addGreeterService(grpcServer.getServiceRegistry());
+
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+            clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    Assertions.assertThat(span.tags())
+            .contains(MapEntry.entry("grpc.status", "OK"))
+            .contains(MapEntry.entry("error", false));
+  }
+
+  @Test
+  public void TestTracedClientAndServer() {
     // register server tracer to verify active span on server side
     GlobalTracer.register(serverTracer);
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
-    TracedClient client = new TracedClient("localhost", port, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.startWithInterceptor(serverTracingInterceptor, port);
+    service.addGreeterServiceWithInterceptor(serverTracingInterceptor, grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("a client span should have been created for the request",

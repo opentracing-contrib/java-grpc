@@ -268,7 +268,7 @@ We also provide two built-in implementations:
 ## Custom Span Decorators
 
 If you want to add custom tags or logs to the server and client spans, then you can implement the 
-`ClientSpanDecorator` and `ServerSpanDecorator` interfaces.
+`ClientSpanDecorator`, `ClientCloseDecorator`, `ServerSpanDecorator`, and `ServerCloseDecorator` interfaces.
 
 ```java
 ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor
@@ -281,17 +281,31 @@ ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor
             span.log("Example log");
         }
     })
+    .withClientCloseDecorator(new ClientCloseDecorator() {
+        @Override
+        public void close(Span span, Status status, Metadata trailers) {
+            span.setTag("grpc.status", status.getCode().name());
+            Tags.ERROR.set(span, !status.isOk());
+        }
+    })
     ...
     .build();
     
 ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor
     .Builder(tracer)
     ...
-    .withServerSpanDecorator(new ServerSpanDecorator(){
+    .withServerSpanDecorator(new ServerSpanDecorator() {
         @Override
         public void interceptCall(Span span, ServerCall call, Metadata headers) {
             span.setTag("some_tag", "some_value");
             span.log("Example log");
+        }
+    })
+    .withServerCloseDecorator(new ServerCloseDecorator() {
+        @Override
+        public void close(Span span, Status status, Metadata trailers) {
+            span.setTag("grpc.status", status.getCode().name());
+            Tags.ERROR.set(span, !status.isOk());
         }
     })
     ...

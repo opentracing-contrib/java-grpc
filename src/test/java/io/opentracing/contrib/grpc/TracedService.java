@@ -13,59 +13,21 @@
  */
 package io.opentracing.contrib.grpc;
 
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
+import io.grpc.util.MutableHandlerRegistry;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
 import io.opentracing.contrib.grpc.gen.HelloReply;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
 import io.opentracing.util.GlobalTracer;
-import java.io.IOException;
-
 
 public class TracedService {
 
-  private Server server;
-
-  void start(int port) throws IOException {
-    server = ServerBuilder.forPort(port)
-        .addService(new GreeterImpl())
-        .build()
-        .start();
-
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        TracedService.this.stop();
-      }
-    });
+  void addGreeterService(MutableHandlerRegistry registry) {
+    registry.addService(new GreeterImpl());
   }
 
-  void startWithInterceptor(ServerTracingInterceptor tracingInterceptor, int port)
-      throws IOException {
-
-    server = ServerBuilder.forPort(port)
-        .addService(tracingInterceptor.intercept(new GreeterImpl()))
-        .build()
-        .start();
-
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        TracedService.this.stop();
-      }
-    });
-  }
-
-  void stop() {
-    if (server != null) {
-      server.shutdown();
-      try {
-        server.awaitTermination();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
+  void addGreeterServiceWithInterceptor(ServerTracingInterceptor tracingInterceptor, MutableHandlerRegistry registry) {
+    registry.addService(tracingInterceptor.intercept(new GreeterImpl()));
   }
 
   private class GreeterImpl extends GreeterGrpc.GreeterImplBase {
