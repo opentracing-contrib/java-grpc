@@ -32,6 +32,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapExtractAdapter;
+import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -149,21 +150,18 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
         .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
-    final ServerCall<ReqT, RespT> maybeDecoratedCall;
-    if (serverCloseDecorator != null) {
-      maybeDecoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
-        @Override
-        public void close(Status status, Metadata trailers) {
+    final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
+      @Override
+      public void close(Status status, Metadata trailers) {
+        GrpcTags.setStatusTags(span, status);
+        if (serverCloseDecorator != null) {
           serverCloseDecorator.close(span, status, trailers);
-          super.close(status, trailers);
         }
-      };
-    } else {
-      // No decorator defined for server close - don't wrap call unnecessarily
-      maybeDecoratedCall = call;
-    }
+        super.close(status, trailers);
+      }
+    };
     ServerCall.Listener<ReqT> listenerWithContext = Contexts
-        .interceptCall(ctxWithSpan, maybeDecoratedCall, headers, next);
+        .interceptCall(ctxWithSpan, decoratedCall, headers, next);
 
     return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
         listenerWithContext) {
@@ -210,21 +208,22 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   }
 
   private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
-    Span span;
+    Tracer.SpanBuilder spanBuilder;
     try {
       SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS,
           new TextMapExtractAdapter(headers));
       if (parentSpanCtx == null) {
-        span = tracer.buildSpan(operationName).start();
+        spanBuilder = tracer.buildSpan(operationName);
       } else {
-        span = tracer.buildSpan(operationName).asChildOf(parentSpanCtx).start();
+        spanBuilder = tracer.buildSpan(operationName).asChildOf(parentSpanCtx);
       }
     } catch (IllegalArgumentException iae) {
-      span = tracer.buildSpan(operationName)
-          .withTag("Error", "Extract failed and an IllegalArgumentException was thrown")
-          .start();
+      spanBuilder = tracer.buildSpan(operationName)
+          .withTag("Error", "Extract failed and an IllegalArgumentException was thrown");
     }
-    return span;
+    return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+      .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_VALUE)
+      .start();
   }
 
   /**

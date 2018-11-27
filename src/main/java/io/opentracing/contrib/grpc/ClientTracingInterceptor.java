@@ -29,6 +29,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
+import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -218,6 +219,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 }
               }
             }
+            GrpcTags.setStatusTags(span, status);
             if (clientCloseDecorator != null) {
               clientCloseDecorator.close(span, status, trailers);
             }
@@ -263,11 +265,15 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   }
 
   private Span createSpanFromParent(SpanContext parentSpanContext, String operationName) {
+    final Tracer.SpanBuilder spanBuilder;
     if (parentSpanContext == null) {
-      return tracer.buildSpan(operationName).start();
+      spanBuilder = tracer.buildSpan(operationName);
     } else {
-      return tracer.buildSpan(operationName).asChildOf(parentSpanContext).start();
+      spanBuilder = tracer.buildSpan(operationName).asChildOf(parentSpanContext);
     }
+    return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
+      .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_VALUE)
+      .start();
   }
 
   /**
