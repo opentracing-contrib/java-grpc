@@ -27,6 +27,7 @@ public interface ClientSpanDecorator {
   /**
    * The method of the implementation is executed inside
    * {@link ClientTracingInterceptor#interceptCall(MethodDescriptor, CallOptions, Channel)}
+   *
    * @param span The span created by {@link ClientTracingInterceptor}
    * @param callOptions The {@link ServerCall} parameter of
    * {@link ClientTracingInterceptor#interceptCall(MethodDescriptor, CallOptions, Channel)}

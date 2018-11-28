@@ -272,8 +272,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       spanBuilder = tracer.buildSpan(operationName).asChildOf(parentSpanContext);
     }
     return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
-      .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_VALUE)
-      .start();
+        .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
+        .start();
   }
 
   /**
@@ -415,7 +415,9 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     ALL_CALL_OPTIONS("grpc.call_options"),
     HEADERS("grpc.headers");
 
-    /** The Span tag key for this attribute */
+    /**
+     * The Span tag key for this attribute
+     */
     final String key;
 
     ClientRequestAttribute(String key) {

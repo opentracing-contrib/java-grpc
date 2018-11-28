@@ -22,6 +22,7 @@ public interface ClientCloseDecorator {
   /**
    * The method of the implementation is executed inside
    * {@link ForwardingClientCallListener#onClose(Status, Metadata)}
+   *
    * @param span The span created by {@link ClientTracingInterceptor}
    * @param status The status passed to {@link ForwardingClientCallListener#onClose(Status, Metadata)}.
    * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose(Status, Metadata)}

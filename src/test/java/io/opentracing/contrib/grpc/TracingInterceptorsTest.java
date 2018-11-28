@@ -45,26 +45,27 @@ import org.junit.Test;
 
 public class TracingInterceptorsTest {
 
-  private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object> of(
-    Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_VALUE,
-    GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name()
+  private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>of(
+      Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME,
+      GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name()
   );
 
-  private static final Map<String, Object> BASE_SERVER_TAGS = ImmutableMap.<String, Object> builder()
-    .putAll(BASE_TAGS)
-    .put(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
-    .build();
+  private static final Map<String, Object> BASE_SERVER_TAGS = ImmutableMap.<String, Object>builder()
+      .putAll(BASE_TAGS)
+      .put(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+      .build();
 
-  private static final Map<String, Object> BASE_CLIENT_TAGS = ImmutableMap.<String, Object> builder()
-    .putAll(BASE_TAGS)
-    .put(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
-    .build();
+  private static final Map<String, Object> BASE_CLIENT_TAGS = ImmutableMap.<String, Object>builder()
+      .putAll(BASE_TAGS)
+      .put(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
+      .build();
 
   private static final Set<String> CLIENT_ATTRIBUTE_TAGS;
 
   static {
     final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-    for (ClientTracingInterceptor.ClientRequestAttribute attribute : ClientTracingInterceptor.ClientRequestAttribute.values()) {
+    for (ClientTracingInterceptor.ClientRequestAttribute attribute : ClientTracingInterceptor.ClientRequestAttribute
+        .values()) {
       builder.add(attribute.key);
     }
     CLIENT_ATTRIBUTE_TAGS = builder.build();
@@ -105,7 +106,8 @@ public class TracingInterceptorsTest {
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertTrue("span should have no logs", span.logEntries().isEmpty());
-    Assertions.assertThat(span.tags()).as("span should have base server tags").isEqualTo(BASE_SERVER_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base server tags")
+        .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -132,7 +134,8 @@ public class TracingInterceptorsTest {
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should log onMessage and onComplete", 2, span.logEntries().size());
-    Assertions.assertThat(span.tags()).as("span should have base server tags").isEqualTo(BASE_SERVER_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base server tags")
+        .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -159,7 +162,8 @@ public class TracingInterceptorsTest {
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should log onMessage and onHalfClose", span.logEntries().size(), 2);
-    Assertions.assertThat(span.tags()).as("span should have base server tags").isEqualTo(BASE_SERVER_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base server tags")
+        .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -192,7 +196,8 @@ public class TracingInterceptorsTest {
         PREFIX + "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have no logs", span.logEntries().size(), 0);
-    Assertions.assertThat(span.tags()).as("span should have base server tags").isEqualTo(BASE_SERVER_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base server tags")
+        .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -218,9 +223,11 @@ public class TracingInterceptorsTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have no logs", span.logEntries().size(), 0);
-    Assertions.assertThat(span.tags()).as("span should have base server tags").containsAllEntriesOf(BASE_SERVER_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base server tags")
+        .containsAllEntriesOf(BASE_SERVER_TAGS);
     Assertions.assertThat(span.tags()).as("span should have a tag for each traced attribute")
-        .hasSize(ServerTracingInterceptor.ServerRequestAttribute.values().length + BASE_SERVER_TAGS.size());
+        .hasSize(ServerTracingInterceptor.ServerRequestAttribute.values().length + BASE_SERVER_TAGS
+            .size());
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -240,9 +247,9 @@ public class TracingInterceptorsTest {
     };
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
-            .Builder(serverTracer)
-            .withServerSpanDecorator(serverSpanDecorator)
-            .build();
+        .Builder(serverTracer)
+        .withServerSpanDecorator(serverSpanDecorator)
+        .build();
 
     service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
@@ -250,20 +257,20 @@ public class TracingInterceptorsTest {
 
     await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
-            serverTracer.finishedSpans().size(), 1);
+        serverTracer.finishedSpans().size(), 1);
 
     MockSpan span = serverTracer.finishedSpans().get(0);
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     Assertions.assertThat(span.logEntries()).as("span should have one log added in the decorator")
-            .hasSize(1);
+        .hasSize(1);
     Assertions.assertThat(span.tags()).as("span should have 3 tags added in the decorator")
-            .hasSize(3 + BASE_SERVER_TAGS.size());
+        .hasSize(3 + BASE_SERVER_TAGS.size());
     Assertions.assertThat(span.tags()).as("span contains added tags")
-            .contains(MapEntry.entry("test_tag", "test_value"))
-            .containsKeys("tag_from_call", "tag_from_headers");
+        .contains(MapEntry.entry("test_tag", "test_value"))
+        .containsKeys("tag_from_call", "tag_from_headers");
     assertFalse("span should have no baggage",
-            span.context().baggageItems().iterator().hasNext());
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
@@ -277,9 +284,9 @@ public class TracingInterceptorsTest {
     };
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
-            .Builder(serverTracer)
-            .withServerCloseDecorator(serverCloseDecorator)
-            .build();
+        .Builder(serverTracer)
+        .withServerCloseDecorator(serverCloseDecorator)
+        .build();
 
     service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
 
@@ -287,11 +294,11 @@ public class TracingInterceptorsTest {
 
     await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
-            serverTracer.finishedSpans().size(), 1);
+        serverTracer.finishedSpans().size(), 1);
 
     MockSpan span = serverTracer.finishedSpans().get(0);
     Assertions.assertThat(span.tags())
-            .contains(MapEntry.entry("grpc.statusCode", Status.OK.getCode().value()));
+        .contains(MapEntry.entry("grpc.statusCode", Status.OK.getCode().value()));
   }
 
   @Test
@@ -310,7 +317,8 @@ public class TracingInterceptorsTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have no logs", span.logEntries().size(), 0);
-    Assertions.assertThat(span.tags()).as("span should have base client tags").isEqualTo(BASE_CLIENT_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -336,7 +344,8 @@ public class TracingInterceptorsTest {
     System.out.println(span.logEntries());
     assertEquals("span should have logs for start, onHeaders, onMessage, onClose, sendMessage", 5,
         span.logEntries().size());
-    Assertions.assertThat(span.tags()).as("span should have base client tags").isEqualTo(BASE_CLIENT_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -361,7 +370,8 @@ public class TracingInterceptorsTest {
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have log for onMessage, halfClose, sendMessage", 3,
         span.logEntries().size());
-    Assertions.assertThat(span.tags()).as("span should have base client tags").isEqualTo(BASE_CLIENT_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -392,7 +402,8 @@ public class TracingInterceptorsTest {
         PREFIX + "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have no logs", span.logEntries().size(), 0);
-    Assertions.assertThat(span.tags()).as("span should have base client tags").isEqualTo(BASE_CLIENT_TAGS);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
@@ -416,8 +427,10 @@ public class TracingInterceptorsTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have no logs", span.logEntries().size(), 0);
-    Assertions.assertThat(span.tags()).as("span should have base client tags").containsAllEntriesOf(BASE_CLIENT_TAGS);
-    Assertions.assertThat(span.tags().keySet()).as("span should have tags for all client request attributes")
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .containsAllEntriesOf(BASE_CLIENT_TAGS);
+    Assertions.assertThat(span.tags().keySet())
+        .as("span should have tags for all client request attributes")
         .containsAll(CLIENT_ATTRIBUTE_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
@@ -437,29 +450,29 @@ public class TracingInterceptorsTest {
     };
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
-            .Builder(clientTracer)
-            .withClientSpanDecorator(clientSpanDecorator)
-            .build();
+        .Builder(clientTracer)
+        .withClientSpanDecorator(clientSpanDecorator)
+        .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
-            clientTracer.finishedSpans().size(), 1);
+        clientTracer.finishedSpans().size(), 1);
 
     MockSpan span = clientTracer.finishedSpans().get(0);
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have one log from the decorator",
-            span.logEntries().size(), 1);
+        span.logEntries().size(), 1);
     Assertions.assertThat(span.tags()).as("span should have 3 tags from the decorator")
-            .hasSize(3 + BASE_CLIENT_TAGS.size());
+        .hasSize(3 + BASE_CLIENT_TAGS.size());
     Assertions.assertThat(span.tags()).as("span contains added tags")
-            .contains(MapEntry.entry("test_tag", "test_value"))
-            .containsKeys("tag_from_method", "tag_from_call_options");
+        .contains(MapEntry.entry("test_tag", "test_value"))
+        .containsKeys("tag_from_method", "tag_from_call_options");
     assertFalse("span should have no baggage",
-            span.context().baggageItems().iterator().hasNext());
+        span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
@@ -472,20 +485,20 @@ public class TracingInterceptorsTest {
     };
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
-            .Builder(clientTracer)
-            .withClientCloseDecorator(clientCloseDecorator)
-            .build();
+        .Builder(clientTracer)
+        .withClientCloseDecorator(clientCloseDecorator)
+        .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     service.addGreeterService(grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("one span should have been created and finished for one client request",
-            clientTracer.finishedSpans().size(), 1);
+        clientTracer.finishedSpans().size(), 1);
 
     MockSpan span = clientTracer.finishedSpans().get(0);
     Assertions.assertThat(span.tags())
-            .contains(MapEntry.entry("grpc.statusCode", Status.OK.getCode().value()));
+        .contains(MapEntry.entry("grpc.statusCode", Status.OK.getCode().value()));
   }
 
   @Test
@@ -498,7 +511,8 @@ public class TracingInterceptorsTest {
 
     ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.addGreeterServiceWithInterceptor(serverTracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptor(serverTracingInterceptor,
+        grpcServer.getServiceRegistry());
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("a client span should have been created for the request",
