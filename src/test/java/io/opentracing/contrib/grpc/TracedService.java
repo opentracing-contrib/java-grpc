@@ -26,7 +26,8 @@ public class TracedService {
     registry.addService(new GreeterImpl());
   }
 
-  void addGreeterServiceWithInterceptor(ServerTracingInterceptor tracingInterceptor, MutableHandlerRegistry registry) {
+  void addGreeterServiceWithInterceptor(ServerTracingInterceptor tracingInterceptor,
+      MutableHandlerRegistry registry) {
     registry.addService(tracingInterceptor.intercept(new GreeterImpl()));
   }
 

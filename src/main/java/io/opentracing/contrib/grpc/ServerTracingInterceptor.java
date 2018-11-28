@@ -150,7 +150,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
         .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
-    final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
+    final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(
+        call) {
       @Override
       public void close(Status status, Metadata trailers) {
         GrpcTags.setStatusTags(span, status);
@@ -222,8 +223,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           .withTag("Error", "Extract failed and an IllegalArgumentException was thrown");
     }
     return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
-      .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_VALUE)
-      .start();
+        .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
+        .start();
   }
 
   /**
@@ -310,6 +311,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     /**
      * Decorates the server span with custom data when the gRPC call is closed.
+     *
      * @param serverCloseDecorator used to decorate the server span
      * @return this Builder configured to decorate server span when the gRPC call is closed
      */

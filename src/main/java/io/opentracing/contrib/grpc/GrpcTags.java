@@ -22,23 +22,29 @@ import io.opentracing.tag.Tags;
  * Package private utility methods for common gRPC tags.
  */
 final class GrpcTags {
-    private GrpcTags() {}
+  private GrpcTags() {
+  }
 
-    /** gRPC status code tag */
-    static StringTag GRPC_STATUS = new StringTag("grpc.status");
+  /**
+   * gRPC status code tag
+   */
+  static StringTag GRPC_STATUS = new StringTag("grpc.status");
 
-    /** Value for {@link Tags#COMPONENT} for gRPC */
-    static String COMPONENT_VALUE = "grpc-java";
+  /**
+   * Value for {@link Tags#COMPONENT} for gRPC
+   */
+  static String COMPONENT_NAME = "java-grpc";
 
-    /**
-     * Sets {@code grpc.status} and {@code error} tags on span.
-     * @param span Span
-     * @param status gRPC call status
-     */
-    static void setStatusTags(Span span, Status status) {
-        GRPC_STATUS.set(span, status.getCode().name());
-        if (!status.isOk()) {
-            Tags.ERROR.set(span, true);
-        }
+  /**
+   * Sets {@code grpc.status} and {@code error} tags on span.
+   *
+   * @param span Span
+   * @param status gRPC call status
+   */
+  static void setStatusTags(Span span, Status status) {
+    GRPC_STATUS.set(span, status.getCode().name());
+    if (!status.isOk()) {
+      Tags.ERROR.set(span, true);
     }
+  }
 }

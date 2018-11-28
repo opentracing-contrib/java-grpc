@@ -13,6 +13,8 @@
  */
 package io.opentracing.contrib.grpc;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.grpc.Status;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
@@ -20,27 +22,25 @@ import io.opentracing.tag.Tags;
 import org.assertj.core.data.MapEntry;
 import org.junit.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 public class GrpcTagsTest {
-    @Test
-    public void testStatusOk() {
-        final Status status = Status.OK;
-        MockSpan span = new MockTracer().buildSpan("").start();
-        GrpcTags.setStatusTags(span, status);
-        assertThat(span.tags())
-            .containsExactly(MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()));
-    }
+  @Test
+  public void testStatusOk() {
+    final Status status = Status.OK;
+    MockSpan span = new MockTracer().buildSpan("").start();
+    GrpcTags.setStatusTags(span, status);
+    assertThat(span.tags())
+        .containsExactly(MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()));
+  }
 
-    @Test
-    public void testStatusError() {
-        final Status status = Status.INTERNAL;
-        MockSpan span = new MockTracer().buildSpan("").start();
-        GrpcTags.setStatusTags(span, status);
-        assertThat(span.tags())
-                .containsOnly(
-                    MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()),
-                    MapEntry.entry(Tags.ERROR.getKey(), Boolean.TRUE)
-                );
-    }
+  @Test
+  public void testStatusError() {
+    final Status status = Status.INTERNAL;
+    MockSpan span = new MockTracer().buildSpan("").start();
+    GrpcTags.setStatusTags(span, status);
+    assertThat(span.tags())
+        .containsOnly(
+            MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()),
+            MapEntry.entry(Tags.ERROR.getKey(), Boolean.TRUE)
+        );
+  }
 }

@@ -27,6 +27,7 @@ public interface ServerSpanDecorator {
   /**
    * The method of the implementation is executed inside
    * {@link ServerTracingInterceptor#interceptCall(ServerCall, Metadata, ServerCallHandler)}
+   *
    * @param span The span created by {@link ServerTracingInterceptor}
    * @param call The {@link ServerCall} parameter of
    * {@link ServerTracingInterceptor#interceptCall(ServerCall, Metadata, ServerCallHandler)}
