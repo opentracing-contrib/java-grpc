@@ -13,10 +13,16 @@
  */
 package io.opentracing.contrib.grpc;
 
+import io.grpc.Attributes;
+import io.grpc.Grpc;
 import io.grpc.Status;
+import io.grpc.inprocess.InProcessSocketAddress;
 import io.opentracing.Span;
 import io.opentracing.tag.StringTag;
 import io.opentracing.tag.Tags;
+
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 
 /**
  * Package private utility methods for common gRPC tags.
@@ -29,6 +35,11 @@ final class GrpcTags {
    * gRPC status code tag
    */
   static StringTag GRPC_STATUS = new StringTag("grpc.status");
+
+  /**
+   * peer.address tag
+   */
+  static StringTag PEER_ADDRESS = new StringTag("peer.address");
 
   /**
    * Value for {@link Tags#COMPONENT} for gRPC
@@ -45,6 +56,21 @@ final class GrpcTags {
     GRPC_STATUS.set(span, status.getCode().name());
     if (!status.isOk()) {
       Tags.ERROR.set(span, true);
+    }
+  }
+
+  /**
+   * Sets the {@code peer.address} tag on the Span from the given server or client call attributes.
+   * @param span span on which to set tag
+   * @param attributes attributes from server or client call
+   */
+  static void setPeerAddressTag(Span span, Attributes attributes) {
+    SocketAddress address = attributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
+    if (address instanceof InProcessSocketAddress) {
+      PEER_ADDRESS.set(span, ((InProcessSocketAddress) address).getName());
+    } else if (address instanceof InetSocketAddress) {
+      final InetSocketAddress inetAddress = (InetSocketAddress) address;
+      PEER_ADDRESS.set(span, inetAddress.getHostString() + ':' + inetAddress.getPort());
     }
   }
 }
