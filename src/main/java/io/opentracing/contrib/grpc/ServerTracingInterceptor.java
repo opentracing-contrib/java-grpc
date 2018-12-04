@@ -145,6 +145,9 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         case HEADERS:
           span.setTag("grpc.headers", headers.toString());
           break;
+        case PEER_ADDRESS:
+          GrpcTags.setPeerAddressTag(span, call.getAttributes());
+          break;
       }
     }
 
@@ -334,7 +337,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     HEADERS,
     METHOD_TYPE,
     METHOD_NAME,
-    CALL_ATTRIBUTES
+    CALL_ATTRIBUTES,
+    PEER_ADDRESS
   }
 
 }
