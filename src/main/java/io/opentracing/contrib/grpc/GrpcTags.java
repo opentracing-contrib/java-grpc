@@ -20,7 +20,6 @@ import io.grpc.inprocess.InProcessSocketAddress;
 import io.opentracing.Span;
 import io.opentracing.tag.StringTag;
 import io.opentracing.tag.Tags;
-
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
@@ -61,6 +60,7 @@ final class GrpcTags {
 
   /**
    * Sets the {@code peer.address} tag on the Span from the given server or client call attributes.
+   *
    * @param span span on which to set tag
    * @param attributes attributes from server or client call
    */
