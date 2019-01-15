@@ -21,7 +21,6 @@ import io.grpc.Status;
 import io.grpc.inprocess.InProcessSocketAddress;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
-import io.opentracing.tag.Tags;
 import java.net.InetSocketAddress;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -45,8 +44,7 @@ public class GrpcTagsTest {
     GrpcTags.setStatusTags(span, status);
     assertThat(span.tags())
         .containsOnly(
-            MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()),
-            MapEntry.entry(Tags.ERROR.getKey(), Boolean.TRUE)
+            MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name())
         );
   }
 
