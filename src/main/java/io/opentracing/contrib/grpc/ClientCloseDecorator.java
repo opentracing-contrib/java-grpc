@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 The OpenTracing Authors
+ * Copyright 2017-2019 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -20,12 +20,14 @@ import io.opentracing.Span;
 
 public interface ClientCloseDecorator {
   /**
-   * The method of the implementation is executed inside
-   * {@link ForwardingClientCallListener#onClose(Status, Metadata)}
+   * The method of the implementation is executed inside {@link ForwardingClientCallListener#onClose(Status,
+   * Metadata)}
    *
    * @param span The span created by {@link ClientTracingInterceptor}
-   * @param status The status passed to {@link ForwardingClientCallListener#onClose(Status, Metadata)}.
-   * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose(Status, Metadata)}
+   * @param status The status passed to {@link ForwardingClientCallListener#onClose(Status,
+   * Metadata)}.
+   * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose(Status,
+   * Metadata)}
    */
   void close(Span span, Status status, Metadata trailers);
 }

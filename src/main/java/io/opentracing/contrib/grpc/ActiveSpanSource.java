@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 The OpenTracing Authors
+ * Copyright 2017-2019 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -21,8 +21,7 @@ import io.opentracing.Span;
 public interface ActiveSpanSource {
 
   /**
-   * ActiveSpanSource implementation that always returns
-   * null as the active span
+   * ActiveSpanSource implementation that always returns null as the active span
    */
   ActiveSpanSource NONE = new ActiveSpanSource() {
     @Override
@@ -32,8 +31,7 @@ public interface ActiveSpanSource {
   };
 
   /**
-   * ActiveSpanSource implementation that returns the
-   * current span stored in the GRPC context under
+   * ActiveSpanSource implementation that returns the current span stored in the GRPC context under
    * {@link OpenTracingContextKey}
    */
   ActiveSpanSource GRPC_CONTEXT = new ActiveSpanSource() {

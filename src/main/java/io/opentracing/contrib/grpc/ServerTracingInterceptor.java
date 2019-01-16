@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 The OpenTracing Authors
+ * Copyright 2017-2019 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -41,8 +41,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * An interceptor that applies tracing via OpenTracing to all requests
- * to the server.
+ * An interceptor that applies tracing via OpenTracing to all requests to the server.
  */
 public class ServerTracingInterceptor implements ServerInterceptor {
 
@@ -251,8 +250,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
-     * @param tracer to use for this interceptor
-     * Creates a Builder with default configuration
+     * @param tracer to use for this interceptor Creates a Builder with default configuration
      */
     public Builder(Tracer tracer) {
       this.tracer = tracer;
@@ -272,8 +270,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
-     * @param attributes to set as tags on server spans
-     * created by this interceptor
+     * @param attributes to set as tags on server spans created by this interceptor
      * @return this Builder configured to trace request attributes
      */
     public Builder withTracedAttributes(ServerRequestAttribute... attributes) {

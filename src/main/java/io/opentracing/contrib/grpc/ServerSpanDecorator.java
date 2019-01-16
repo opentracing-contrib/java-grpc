@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 The OpenTracing Authors
+ * Copyright 2017-2019 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -19,20 +19,20 @@ import io.grpc.ServerCallHandler;
 import io.opentracing.Span;
 
 /**
- * An interface for adding custom span tags to the spans created by
- * {@link ServerTracingInterceptor}
+ * An interface for adding custom span tags to the spans created by {@link
+ * ServerTracingInterceptor}
  */
 public interface ServerSpanDecorator {
 
   /**
-   * The method of the implementation is executed inside
-   * {@link ServerTracingInterceptor#interceptCall(ServerCall, Metadata, ServerCallHandler)}
+   * The method of the implementation is executed inside {@link ServerTracingInterceptor#interceptCall(ServerCall,
+   * Metadata, ServerCallHandler)}
    *
    * @param span The span created by {@link ServerTracingInterceptor}
-   * @param call The {@link ServerCall} parameter of
-   * {@link ServerTracingInterceptor#interceptCall(ServerCall, Metadata, ServerCallHandler)}
-   * @param headers The {@link Metadata} parameter of
-   * {@link ServerTracingInterceptor#interceptCall(ServerCall, Metadata, ServerCallHandler)}
+   * @param call The {@link ServerCall} parameter of {@link ServerTracingInterceptor#interceptCall(ServerCall,
+   * Metadata, ServerCallHandler)}
+   * @param headers The {@link Metadata} parameter of {@link ServerTracingInterceptor#interceptCall(ServerCall,
+   * Metadata, ServerCallHandler)}
    */
   void interceptCall(Span span, ServerCall call, Metadata headers);
 }
