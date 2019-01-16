@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 The OpenTracing Authors
+ * Copyright 2017-2019 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -16,14 +16,13 @@ package io.opentracing.contrib.grpc;
 import io.grpc.MethodDescriptor;
 
 /**
- * Interface that allows span operation names to be constructed from an RPC's
- * method descriptor.
+ * Interface that allows span operation names to be constructed from an RPC's method descriptor.
  */
 public interface OperationNameConstructor {
 
   /**
-   * Default span operation name constructor, that will return an RPC's method
-   * name when constructOperationName is called.
+   * Default span operation name constructor, that will return an RPC's method name when
+   * constructOperationName is called.
    */
   OperationNameConstructor DEFAULT = new OperationNameConstructor() {
     @Override

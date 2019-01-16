@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 The OpenTracing Authors
+ * Copyright 2017-2019 The OpenTracing Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -20,8 +20,9 @@ import io.opentracing.SpanContext;
 /**
  * A {@link io.grpc.Context} key for the current OpenTracing trace state.
  *
- * Can be used to get the active span, or to set the active span for a scoped unit of work.
- * See the <a href="../../../../../../README.rst">grpc-java OpenTracing docs</a> for use cases and examples.
+ * Can be used to get the active span, or to set the active span for a scoped unit of work. See the
+ * <a href="../../../../../../README.rst">grpc-java OpenTracing docs</a> for use cases and
+ * examples.
  */
 public class OpenTracingContextKey {
 
