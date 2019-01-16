@@ -53,9 +53,6 @@ final class GrpcTags {
    */
   static void setStatusTags(Span span, Status status) {
     GRPC_STATUS.set(span, status.getCode().name());
-    if (!status.isOk()) {
-      Tags.ERROR.set(span, true);
-    }
   }
 
   /**
