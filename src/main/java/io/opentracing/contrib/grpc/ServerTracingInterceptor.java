@@ -124,87 +124,96 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     final String operationName = operationNameConstructor
         .constructOperationName(call.getMethodDescriptor());
-    final Scope scope = getSpanFromHeaders(headerMap, operationName);
-    final Span span = scope.span();
+    final Span span = getSpanFromHeaders(headerMap, operationName);
 
-    if (serverSpanDecorator != null) {
-      serverSpanDecorator.interceptCall(span, call, headers);
+    try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+
+      if (serverSpanDecorator != null) {
+        serverSpanDecorator.interceptCall(span, call, headers);
+      }
+
+      for (ServerRequestAttribute attr : this.tracedAttributes) {
+        switch (attr) {
+          case METHOD_TYPE:
+            span.setTag("grpc.method_type", call.getMethodDescriptor().getType().toString());
+            break;
+          case METHOD_NAME:
+            span.setTag("grpc.method_name", call.getMethodDescriptor().getFullMethodName());
+            break;
+          case CALL_ATTRIBUTES:
+            span.setTag("grpc.call_attributes", call.getAttributes().toString());
+            break;
+          case HEADERS:
+            span.setTag("grpc.headers", headers.toString());
+            break;
+          case PEER_ADDRESS:
+            GrpcTags.setPeerAddressTag(span, call.getAttributes());
+            break;
+        }
+      }
+
+      Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
+          .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
+      final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(
+          call) {
+        @Override
+        public void close(Status status, Metadata trailers) {
+          GrpcTags.setStatusTags(span, status);
+          if (serverCloseDecorator != null) {
+            serverCloseDecorator.close(span, status, trailers);
+          }
+          super.close(status, trailers);
+        }
+      };
+      ServerCall.Listener<ReqT> listenerWithContext = Contexts
+          .interceptCall(ctxWithSpan, decoratedCall, headers, next);
+
+      return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
+          listenerWithContext) {
+
+        @Override
+        public void onMessage(ReqT message) {
+          if (streaming || verbose) {
+            span.log(ImmutableMap.of("Message received", message));
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+            delegate().onMessage(message);
+          }
+        }
+
+        @Override
+        public void onHalfClose() {
+          if (streaming) {
+            span.log("Client finished sending messages");
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+            delegate().onHalfClose();
+          }
+
+        }
+
+        @Override
+        public void onCancel() {
+          try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+            span.log("Call cancelled");
+            delegate().onCancel();
+          }
+        }
+
+        @Override
+        public void onComplete() {
+          if (verbose) {
+            span.log("Call completed");
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+            delegate().onComplete();
+          }
+        }
+      };
     }
-
-    for (ServerRequestAttribute attr : this.tracedAttributes) {
-      switch (attr) {
-        case METHOD_TYPE:
-          span.setTag("grpc.method_type", call.getMethodDescriptor().getType().toString());
-          break;
-        case METHOD_NAME:
-          span.setTag("grpc.method_name", call.getMethodDescriptor().getFullMethodName());
-          break;
-        case CALL_ATTRIBUTES:
-          span.setTag("grpc.call_attributes", call.getAttributes().toString());
-          break;
-        case HEADERS:
-          span.setTag("grpc.headers", headers.toString());
-          break;
-        case PEER_ADDRESS:
-          GrpcTags.setPeerAddressTag(span, call.getAttributes());
-          break;
-      }
-    }
-
-    Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
-        .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
-    final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(
-        call) {
-      @Override
-      public void close(Status status, Metadata trailers) {
-        GrpcTags.setStatusTags(span, status);
-        if (serverCloseDecorator != null) {
-          serverCloseDecorator.close(span, status, trailers);
-        }
-        super.close(status, trailers);
-      }
-    };
-    ServerCall.Listener<ReqT> listenerWithContext = Contexts
-        .interceptCall(ctxWithSpan, decoratedCall, headers, next);
-
-    return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
-        listenerWithContext) {
-
-      @Override
-      public void onMessage(ReqT message) {
-        if (streaming || verbose) {
-          span.log(ImmutableMap.of("Message received", message));
-        }
-        delegate().onMessage(message);
-      }
-
-      @Override
-      public void onHalfClose() {
-        if (streaming) {
-          span.log("Client finished sending messages");
-        }
-        delegate().onHalfClose();
-      }
-
-      @Override
-      public void onCancel() {
-        span.log("Call cancelled");
-        delegate().onCancel();
-        scope.close();
-      }
-
-      @Override
-      public void onComplete() {
-        if (verbose) {
-          span.log("Call completed");
-        }
-        delegate().onComplete();
-        scope.close();
-      }
-    };
   }
 
-  private Scope getSpanFromHeaders(Map<String, String> headers, String operationName) {
+  private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
     Tracer.SpanBuilder spanBuilder;
     try {
       SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS,
@@ -220,7 +229,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
     return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
         .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
-        .startActive(true);
+        .start();
   }
 
   /**
