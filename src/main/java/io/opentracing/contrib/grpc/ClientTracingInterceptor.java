@@ -111,7 +111,13 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       }
     }
     if (activeSpanContextSource != null) {
-      return activeSpanContextSource.getActiveSpanContext();
+      final SpanContext spanContext = activeSpanContextSource.getActiveSpanContext();
+      if(spanContext != null) {
+        return spanContext;
+      }
+    }
+    if (tracer.activeSpan() != null) {
+      return tracer.activeSpan().context();
     }
     return null;
   }

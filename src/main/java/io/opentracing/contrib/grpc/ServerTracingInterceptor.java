@@ -124,7 +124,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     final String operationName = operationNameConstructor
         .constructOperationName(call.getMethodDescriptor());
-    final Span span = getSpanFromHeaders(headerMap, operationName);
+    final Scope scope = getSpanFromHeaders(headerMap, operationName);
+    final Span span = scope.span();
 
     if (serverSpanDecorator != null) {
       serverSpanDecorator.interceptCall(span, call, headers);
@@ -174,9 +175,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         if (streaming || verbose) {
           span.log(ImmutableMap.of("Message received", message));
         }
-        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
-          delegate().onMessage(message);
-        }
+        delegate().onMessage(message);
       }
 
       @Override
@@ -184,18 +183,14 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         if (streaming) {
           span.log("Client finished sending messages");
         }
-        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
-          delegate().onHalfClose();
-        }
-
+        delegate().onHalfClose();
       }
 
       @Override
       public void onCancel() {
-        try (Scope ignored = tracer.scopeManager().activate(span, true)) {
-          span.log("Call cancelled");
-          delegate().onCancel();
-        }
+        span.log("Call cancelled");
+        delegate().onCancel();
+        scope.close();
       }
 
       @Override
@@ -203,14 +198,13 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         if (verbose) {
           span.log("Call completed");
         }
-        try (Scope ignored = tracer.scopeManager().activate(span, true)) {
-          delegate().onComplete();
-        }
+        delegate().onComplete();
+        scope.close();
       }
     };
   }
 
-  private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
+  private Scope getSpanFromHeaders(Map<String, String> headers, String operationName) {
     Tracer.SpanBuilder spanBuilder;
     try {
       SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS,
@@ -226,7 +220,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
     return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
         .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
-        .start();
+        .startActive(true);
   }
 
   /**

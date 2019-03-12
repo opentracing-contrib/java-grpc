@@ -88,7 +88,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerBasic() {
+  public void testTracedServerBasic() {
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
@@ -113,7 +113,34 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithVerbosity() {
+  public void testTracedServerTwoInterceptors() {
+    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+
+    ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
+    SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
+
+    service.addGreeterServiceWithTwoInterceptors(tracingInterceptor, secondServerInterceptor,
+        grpcServer.getServiceRegistry());
+
+    assertTrue("call should complete", client.greet("world"));
+
+    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(), 1);
+
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have default name", span.operationName(),
+        "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertTrue("span should have no logs", span.logEntries().isEmpty());
+    Assertions.assertThat(span.tags()).as("span should have base server tags")
+        .isEqualTo(BASE_SERVER_TAGS);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void testTracedServerWithVerbosity() {
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
@@ -141,7 +168,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithStreaming() {
+  public void testTracedServerWithStreaming() {
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
@@ -169,7 +196,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithCustomOperationName() {
+  public void testTracedServerWithCustomOperationName() {
     final String PREFIX = "testing-";
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
@@ -203,7 +230,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithTracedAttributes() {
+  public void testTracedServerWithTracedAttributes() {
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
@@ -233,7 +260,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithServerSpanDecorator() {
+  public void testTracedServerWithServerSpanDecorator() {
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
     ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
       @Override
@@ -274,7 +301,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedServerWithServerCloseDecorator() {
+  public void testTracedServerWithServerCloseDecorator() {
     TracedClient client = new TracedClient(grpcServer.getChannel(), null);
     ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
       @Override
@@ -302,7 +329,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientBasic() {
+  public void testTracedClientBasic() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
@@ -324,7 +351,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithVerbosity() {
+  public void testTracedClientWithVerbosity() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
@@ -351,7 +378,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithStreaming() {
+  public void testTracedClientWithStreaming() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
@@ -377,7 +404,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithOperationName() {
+  public void testTracedClientWithOperationName() {
     final String PREFIX = "testing-";
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
@@ -409,7 +436,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithTracedAttributes() {
+  public void testTracedClientWithTracedAttributes() {
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
@@ -437,7 +464,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithClientSpanDecorator() {
+  public void testTracedClientWithClientSpanDecorator() {
     ClientSpanDecorator clientSpanDecorator = new ClientSpanDecorator() {
       @Override
       public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
@@ -476,7 +503,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientWithClientCloseDecorator() {
+  public void testTracedClientWithClientCloseDecorator() {
     ClientCloseDecorator clientCloseDecorator = new ClientCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
@@ -502,7 +529,7 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void TestTracedClientAndServer() {
+  public void testTracedClientAndServer() {
     // register server tracer to verify active span on server side
     GlobalTracer.register(serverTracer);
 
