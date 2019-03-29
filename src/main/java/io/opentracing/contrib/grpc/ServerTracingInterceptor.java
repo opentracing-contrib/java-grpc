@@ -31,7 +31,7 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
-import io.opentracing.propagation.TextMapExtractAdapter;
+import io.opentracing.propagation.TextMapAdapter;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import java.util.Arrays;
@@ -126,7 +126,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         .constructOperationName(call.getMethodDescriptor());
     final Span span = getSpanFromHeaders(headerMap, operationName);
 
-    try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+    try (Scope ignored = tracer.scopeManager().activate(span)) {
 
       if (serverSpanDecorator != null) {
         serverSpanDecorator.interceptCall(span, call, headers);
@@ -176,7 +176,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           if (streaming || verbose) {
             span.log(ImmutableMap.of("Message received", message));
           }
-          try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onMessage(message);
           }
         }
@@ -186,7 +186,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           if (streaming) {
             span.log("Client finished sending messages");
           }
-          try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onHalfClose();
           }
 
@@ -194,9 +194,11 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
         @Override
         public void onCancel() {
-          try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
             span.log("Call cancelled");
             delegate().onCancel();
+          } finally {
+            span.finish();
           }
         }
 
@@ -205,8 +207,10 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           if (verbose) {
             span.log("Call completed");
           }
-          try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onComplete();
+          } finally {
+            span.finish();
           }
         }
       };
@@ -216,8 +220,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
     Tracer.SpanBuilder spanBuilder;
     try {
-      SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS,
-          new TextMapExtractAdapter(headers));
+      SpanContext parentSpanCtx = tracer
+          .extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
       if (parentSpanCtx == null) {
         spanBuilder = tracer.buildSpan(operationName);
       } else {
