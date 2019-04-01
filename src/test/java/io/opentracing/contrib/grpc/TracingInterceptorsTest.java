@@ -33,15 +33,15 @@ import io.opentracing.mock.MockTracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import io.opentracing.util.GlobalTracerTestUtil;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.data.MapEntry;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 public class TracingInterceptorsTest {
 
@@ -89,7 +89,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerBasic() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
@@ -114,7 +114,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerTwoInterceptors() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
@@ -141,7 +141,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithVerbosity() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -169,7 +169,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithStreaming() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -198,7 +198,7 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedServerWithCustomOperationName() {
     final String PREFIX = "testing-";
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -231,7 +231,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithTracedAttributes() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -261,7 +261,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithServerSpanDecorator() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
     ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
       @Override
       public void interceptCall(Span span, ServerCall call, Metadata headers) {
@@ -302,7 +302,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithServerCloseDecorator() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
     ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
@@ -330,7 +330,6 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientBasic() {
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
@@ -351,8 +350,29 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void testTracedClientWithVerbosity() {
+  public void testTracedClientTwoInterceptors() {
+    SecondClientInterceptor secondClientInterceptor = new SecondClientInterceptor(clientTracer);
+    ClientTracingInterceptor clientTracingInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), secondClientInterceptor, clientTracingInterceptor);
 
+    service.addGreeterService(grpcServer.getServiceRegistry());
+
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void testTracedClientWithVerbosity() {
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withVerbosity()
@@ -379,7 +399,6 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientWithStreaming() {
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withStreaming()
@@ -437,7 +456,6 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientWithTracedAttributes() {
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
