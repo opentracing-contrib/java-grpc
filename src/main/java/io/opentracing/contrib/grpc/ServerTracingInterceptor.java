@@ -73,11 +73,15 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     this.serverCloseDecorator = null;
   }
 
-  private ServerTracingInterceptor(Tracer tracer, OperationNameConstructor operationNameConstructor,
+  private ServerTracingInterceptor(
+      Tracer tracer,
+      OperationNameConstructor operationNameConstructor,
       boolean streaming,
-      boolean verbose, Set<ServerRequestAttribute> tracedAttributes,
+      boolean verbose,
+      Set<ServerRequestAttribute> tracedAttributes,
       ServerSpanDecorator serverSpanDecorator,
       ServerCloseDecorator serverCloseDecorator) {
+
     this.tracer = tracer;
     this.operationNameConstructor = operationNameConstructor;
     this.streaming = streaming;
@@ -111,8 +115,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
       ServerCall<ReqT, RespT> call,
       Metadata headers,
-      ServerCallHandler<ReqT, RespT> next
-  ) {
+      ServerCallHandler<ReqT, RespT> next) {
+
     final Set<String> headerKeys = headers.keys();
     Map<String, String> headerMap = new HashMap<>(headerKeys.size());
     for (String key : headerKeys) {
@@ -122,9 +126,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       }
     }
 
-    final String operationName = operationNameConstructor
-        .constructOperationName(call.getMethodDescriptor());
-    final Span span = getSpanFromHeaders(headerMap, operationName);
+    final Span span = getSpanFromHeaders(headerMap,
+        operationNameConstructor.constructOperationName(call.getMethodDescriptor()));
 
     try (Scope ignored = tracer.scopeManager().activate(span)) {
 
@@ -152,19 +155,23 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         }
       }
 
-      Context ctxWithSpan = Context.current().withValue(OpenTracingContextKey.getKey(), span)
+      Context ctxWithSpan = Context.current()
+          .withValue(OpenTracingContextKey.getKey(), span)
           .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
-      final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(
-          call) {
-        @Override
-        public void close(Status status, Metadata trailers) {
-          GrpcTags.setStatusTags(span, status);
-          if (serverCloseDecorator != null) {
-            serverCloseDecorator.close(span, status, trailers);
-          }
-          super.close(status, trailers);
-        }
-      };
+
+      final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall
+          .SimpleForwardingServerCall<ReqT, RespT>(call) {
+
+            @Override
+            public void close(Status status, Metadata trailers) {
+              GrpcTags.setStatusTags(span, status);
+              if (serverCloseDecorator != null) {
+                serverCloseDecorator.close(span, status, trailers);
+              }
+              super.close(status, trailers);
+            }
+          };
+
       ServerCall.Listener<ReqT> listenerWithContext = Contexts
           .interceptCall(ctxWithSpan, decoratedCall, headers, next);
 
@@ -211,6 +218,13 @@ public class ServerTracingInterceptor implements ServerInterceptor {
             delegate().onComplete();
           } finally {
             span.finish();
+          }
+        }
+
+        @Override
+        public void onReady() {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().onReady();
           }
         }
       };

@@ -93,7 +93,7 @@ public class TracingInterceptorsTest {
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -119,8 +119,8 @@ public class TracingInterceptorsTest {
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
 
-    service.addGreeterServiceWithTwoInterceptors(tracingInterceptor, secondServerInterceptor,
-        grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(
+        grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -148,7 +148,7 @@ public class TracingInterceptorsTest {
         .withVerbosity()
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -176,7 +176,7 @@ public class TracingInterceptorsTest {
         .withStreaming()
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -210,7 +210,7 @@ public class TracingInterceptorsTest {
         })
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -238,7 +238,7 @@ public class TracingInterceptorsTest {
         .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.values())
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -278,7 +278,7 @@ public class TracingInterceptorsTest {
         .withServerSpanDecorator(serverSpanDecorator)
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -315,7 +315,7 @@ public class TracingInterceptorsTest {
         .withServerCloseDecorator(serverCloseDecorator)
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -556,8 +556,7 @@ public class TracingInterceptorsTest {
 
     ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.addGreeterServiceWithInterceptor(serverTracingInterceptor,
-        grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), serverTracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("a client span should have been created for the request",

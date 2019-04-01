@@ -15,12 +15,16 @@ package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertNotNull;
 
-import io.grpc.ForwardingServerCall.SimpleForwardingServerCall;
+import io.grpc.Attributes;
+import io.grpc.ForwardingServerCall;
+import io.grpc.ForwardingServerCallListener;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
+import io.grpc.Status;
+import io.opentracing.Span;
 import io.opentracing.mock.MockTracer;
 
 public class SecondServerInterceptor implements ServerInterceptor {
@@ -31,12 +35,108 @@ public class SecondServerInterceptor implements ServerInterceptor {
   }
 
   @Override
-  public <ReqT, RespT> Listener<ReqT> interceptCall(ServerCall<ReqT, RespT> serverCall,
-      Metadata metadata, ServerCallHandler<ReqT, RespT> serverCallHandler) {
+  public <ReqT, RespT> Listener<ReqT> interceptCall(
+      ServerCall<ReqT, RespT> call,
+      Metadata headers,
+      ServerCallHandler<ReqT, RespT> next) {
 
     assertNotNull(tracer.activeSpan());
 
-    return serverCallHandler.startCall(new SimpleForwardingServerCall<ReqT, RespT>(serverCall) {
-    }, metadata);
+    call = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
+
+      @Override
+      public void request(int numMessages) {
+        assertNotNull(tracer.activeSpan());
+        delegate().request(numMessages);
+      }
+
+      @Override
+      public void sendHeaders(Metadata headers) {
+        assertNotNull(tracer.activeSpan());
+        delegate().sendHeaders(headers);
+      }
+
+      @Override
+      public void sendMessage(RespT message) {
+        assertNotNull(tracer.activeSpan());
+        delegate().sendMessage(message);
+      }
+
+      @Override
+      public boolean isReady() {
+        assertNotNull(tracer.activeSpan());
+        return delegate().isReady();
+      }
+
+      @Override
+      public void close(Status status, Metadata trailers) {
+        assertNotNull(tracer.activeSpan());
+        delegate().close(status, trailers);
+      }
+
+      @Override
+      public boolean isCancelled() {
+        assertNotNull(tracer.activeSpan());
+        return delegate().isCancelled();
+      }
+
+      @Override
+      public void setMessageCompression(boolean enabled) {
+        assertNotNull(tracer.activeSpan());
+        delegate().setMessageCompression(enabled);
+      }
+
+      @Override
+      public void setCompression(String compressor) {
+        assertNotNull(tracer.activeSpan());
+        delegate().setCompression(compressor);
+      }
+
+      @Override
+      public Attributes getAttributes() {
+        assertNotNull(tracer.activeSpan());
+        return delegate().getAttributes();
+      }
+
+      @Override
+      public String getAuthority() {
+        assertNotNull(tracer.activeSpan());
+        return delegate().getAuthority();
+      }
+    };
+
+    return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
+        next.startCall(call, headers)) {
+
+          @Override
+          public void onMessage(ReqT message) {
+            assertNotNull(tracer.activeSpan());
+            delegate().onMessage(message);
+          }
+
+          @Override
+          public void onHalfClose() {
+            assertNotNull(tracer.activeSpan());
+            delegate().onHalfClose();
+          }
+
+          @Override
+          public void onCancel() {
+            assertNotNull(tracer.activeSpan());
+            delegate().onCancel();
+          }
+
+          @Override
+          public void onComplete() {
+            assertNotNull(tracer.activeSpan());
+            delegate().onComplete();
+          }
+
+          @Override
+          public void onReady() {
+            assertNotNull(tracer.activeSpan());
+            delegate().onReady();
+          }
+        };
   }
 }
