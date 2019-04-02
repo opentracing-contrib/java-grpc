@@ -32,7 +32,7 @@ public class GrpcTagsTest {
   public void testStatusOk() {
     final Status status = Status.OK;
     MockSpan span = new MockTracer().buildSpan("").start();
-    GrpcTags.setStatusTags(span, status);
+    GrpcTags.GRPC_STATUS.set(span, status);
     assertThat(span.tags())
         .containsExactly(MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()));
   }
@@ -41,7 +41,7 @@ public class GrpcTagsTest {
   public void testStatusError() {
     final Status status = Status.INTERNAL;
     MockSpan span = new MockTracer().buildSpan("").start();
-    GrpcTags.setStatusTags(span, status);
+    GrpcTags.GRPC_STATUS.set(span, status);
     assertThat(span.tags())
         .containsOnly(
             MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name())
@@ -56,7 +56,7 @@ public class GrpcTagsTest {
         .set(Grpc.TRANSPORT_ATTR_REMOTE_ADDR, address)
         .build();
     MockSpan span = new MockTracer().buildSpan("").start();
-    GrpcTags.setPeerAddressTag(span, attributes);
+    GrpcTags.PEER_ADDRESS.set(span, attributes);
     assertThat(span.tags())
         .containsOnly(MapEntry.entry(GrpcTags.PEER_ADDRESS.getKey(),
             address.getHostString() + ':' + address.getPort()));
@@ -69,7 +69,7 @@ public class GrpcTagsTest {
         .set(Grpc.TRANSPORT_ATTR_REMOTE_ADDR, address)
         .build();
     MockSpan span = new MockTracer().buildSpan("").start();
-    GrpcTags.setPeerAddressTag(span, attributes);
+    GrpcTags.PEER_ADDRESS.set(span, attributes);
     assertThat(span.tags())
         .containsOnly(MapEntry.entry(GrpcTags.PEER_ADDRESS.getKey(), address.getName()));
   }

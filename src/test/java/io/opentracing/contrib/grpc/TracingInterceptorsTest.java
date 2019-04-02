@@ -45,10 +45,10 @@ import java.util.concurrent.TimeUnit;
 
 public class TracingInterceptorsTest {
 
-  private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>of(
-      Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME,
-      GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name()
-  );
+  private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>builder()
+      .put(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
+      .put(GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name())
+      .build();
 
   private static final Map<String, Object> BASE_SERVER_TAGS = ImmutableMap.<String, Object>builder()
       .putAll(BASE_TAGS)
@@ -60,16 +60,22 @@ public class TracingInterceptorsTest {
       .put(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
       .build();
 
-  private static final Set<String> CLIENT_ATTRIBUTE_TAGS;
+  private static final Set<String> CLIENT_ATTRIBUTE_TAGS = ImmutableSet.of(
+      GrpcTags.GRPC_CALL_OPTIONS.getKey(),
+      //TODO: @ExperimentalApi("https://github.com/grpc/grpc-java/issues/1767")
+      //GrpcTags.GRPC_AUTHORITY.getKey(),
+      GrpcTags.GRPC_COMPRESSOR.getKey(),
+      GrpcTags.GRPC_DEADLINE.getKey(),
+      GrpcTags.GRPC_METHOD_NAME.getKey(),
+      GrpcTags.GRPC_METHOD_TYPE.getKey(),
+      GrpcTags.GRPC_HEADERS.getKey());
 
-  static {
-    final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-    for (ClientTracingInterceptor.ClientRequestAttribute attribute : ClientTracingInterceptor.ClientRequestAttribute
-        .values()) {
-      builder.add(attribute.key);
-    }
-    CLIENT_ATTRIBUTE_TAGS = builder.build();
-  }
+  private static final Set<String> SERVER_ATTRIBUTE_TAGS = ImmutableSet.of(
+      GrpcTags.GRPC_METHOD_TYPE.getKey(),
+      GrpcTags.GRPC_METHOD_NAME.getKey(),
+      GrpcTags.GRPC_CALL_ATTRIBUTES.getKey(),
+      GrpcTags.GRPC_HEADERS.getKey(),
+      GrpcTags.PEER_ADDRESS.getKey());
 
   private final MockTracer clientTracer = new MockTracer();
   private final MockTracer serverTracer = new MockTracer();
@@ -252,9 +258,9 @@ public class TracingInterceptorsTest {
     assertEquals("span should have no logs", span.logEntries().size(), 0);
     Assertions.assertThat(span.tags()).as("span should have base server tags")
         .containsAllEntriesOf(BASE_SERVER_TAGS);
-    Assertions.assertThat(span.tags()).as("span should have a tag for each traced attribute")
-        .hasSize(ServerTracingInterceptor.ServerRequestAttribute.values().length + BASE_SERVER_TAGS
-            .size());
+    Assertions.assertThat(span.tags().keySet())
+        .as("span should have tags for all server request attributes")
+        .containsAll(SERVER_ATTRIBUTE_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }

@@ -138,19 +138,19 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       for (ServerRequestAttribute attr : this.tracedAttributes) {
         switch (attr) {
           case METHOD_TYPE:
-            span.setTag("grpc.method_type", call.getMethodDescriptor().getType().toString());
+            GrpcTags.GRPC_METHOD_TYPE.set(span, call.getMethodDescriptor());
             break;
           case METHOD_NAME:
-            span.setTag("grpc.method_name", call.getMethodDescriptor().getFullMethodName());
+            GrpcTags.GRPC_METHOD_NAME.set(span, call.getMethodDescriptor());
             break;
           case CALL_ATTRIBUTES:
-            span.setTag("grpc.call_attributes", call.getAttributes().toString());
+            GrpcTags.GRPC_CALL_ATTRIBUTES.set(span, call.getAttributes());
             break;
           case HEADERS:
-            span.setTag("grpc.headers", headers.toString());
+            GrpcTags.GRPC_HEADERS.set(span, headers);
             break;
           case PEER_ADDRESS:
-            GrpcTags.setPeerAddressTag(span, call.getAttributes());
+            GrpcTags.PEER_ADDRESS.set(span, call.getAttributes());
             break;
         }
       }
@@ -164,7 +164,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
             @Override
             public void close(Status status, Metadata trailers) {
-              GrpcTags.setStatusTags(span, status);
+              GrpcTags.GRPC_STATUS.set(span, status);
               if (serverCloseDecorator != null) {
                 serverCloseDecorator.close(span, status, trailers);
               }
@@ -232,20 +232,19 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   }
 
   private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
-    Tracer.SpanBuilder spanBuilder;
+    Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName);
     try {
-      SpanContext parentSpanCtx = tracer
-          .extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
-      if (parentSpanCtx == null) {
-        spanBuilder = tracer.buildSpan(operationName);
-      } else {
-        spanBuilder = tracer.buildSpan(operationName).asChildOf(parentSpanCtx);
+      SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
+      if (parentSpanCtx != null) {
+        spanBuilder = spanBuilder.asChildOf(parentSpanCtx);
       }
     } catch (IllegalArgumentException iae) {
-      spanBuilder = tracer.buildSpan(operationName)
-          .withTag("Error", "Extract failed and an IllegalArgumentException was thrown");
+      spanBuilder = spanBuilder.withTag(Tags.ERROR, Boolean.TRUE);
+      // TODO: Replace with span error log
+      //.withTag("Error", "Extract failed and an IllegalArgumentException was thrown");
     }
-    return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+    return spanBuilder
+        .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
         .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
         .start();
   }
@@ -358,5 +357,4 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     CALL_ATTRIBUTES,
     PEER_ADDRESS
   }
-
 }

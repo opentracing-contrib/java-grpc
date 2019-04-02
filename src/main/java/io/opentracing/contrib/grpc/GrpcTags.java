@@ -14,60 +14,131 @@
 package io.opentracing.contrib.grpc;
 
 import io.grpc.Attributes;
+import io.grpc.CallOptions;
+import io.grpc.Deadline;
 import io.grpc.Grpc;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.inprocess.InProcessSocketAddress;
 import io.opentracing.Span;
-import io.opentracing.tag.StringTag;
+import io.opentracing.tag.AbstractTag;
+import io.opentracing.tag.Tag;
 import io.opentracing.tag.Tags;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Package private utility methods for common gRPC tags.
  */
 final class GrpcTags {
-  private GrpcTags() {
-  }
 
   /**
-   * gRPC status code tag
+   * grpc.authority tag.
    */
-  static StringTag GRPC_STATUS = new StringTag("grpc.status");
+  static final NullableTag<String> GRPC_AUTHORITY = new NullableTag<>("grpc.authority");
 
   /**
-   * peer.address tag
+   * grpc.call_attributes tag.
    */
-  static StringTag PEER_ADDRESS = new StringTag("peer.address");
+  static final NullableTag<Attributes> GRPC_CALL_ATTRIBUTES = new NullableTag<>("grpc.call_attributes");
 
   /**
-   * Value for {@link Tags#COMPONENT} for gRPC
+   * grpc.call_options tag.
    */
-  static String COMPONENT_NAME = "java-grpc";
+  static final NullableTag<CallOptions> GRPC_CALL_OPTIONS = new NullableTag<>("grpc.call_options");
 
   /**
-   * Sets {@code grpc.status} and {@code error} tags on span.
-   *
-   * @param span Span
-   * @param status gRPC call status
+   * grpc.compressor tag.
    */
-  static void setStatusTags(Span span, Status status) {
-    GRPC_STATUS.set(span, status.getCode().name());
-  }
+  static final NullableTag<String> GRPC_COMPRESSOR = new NullableTag<>("grpc.compressor");
 
   /**
-   * Sets the {@code peer.address} tag on the Span from the given server or client call attributes.
-   *
-   * @param span span on which to set tag
-   * @param attributes attributes from server or client call
+   * grpc.deadline_millis tag.
    */
-  static void setPeerAddressTag(Span span, Attributes attributes) {
-    SocketAddress address = attributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
-    if (address instanceof InProcessSocketAddress) {
-      PEER_ADDRESS.set(span, ((InProcessSocketAddress) address).getName());
-    } else if (address instanceof InetSocketAddress) {
-      final InetSocketAddress inetAddress = (InetSocketAddress) address;
-      PEER_ADDRESS.set(span, inetAddress.getHostString() + ':' + inetAddress.getPort());
+  static final Tag<Deadline> GRPC_DEADLINE = new AbstractTag<Deadline>("grpc.deadline_millis") {
+    @Override
+    public void set(Span span, Deadline deadline) {
+      if (deadline != null) {
+        span.setTag(super.key, String.valueOf(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
+      }
+    }
+  };
+
+  /**
+   * grpc.headers tag.
+   */
+  static final NullableTag<Metadata> GRPC_HEADERS = new NullableTag<>("grpc.headers");
+
+  /**
+   * grpc.method_name tag.
+   */
+  static final Tag<MethodDescriptor> GRPC_METHOD_NAME = new AbstractTag<MethodDescriptor>("grpc.method_name") {
+    @Override
+    public void set(Span span, MethodDescriptor method) {
+      if (method != null) {
+        span.setTag(super.key, method.getFullMethodName());
+      }
+    }
+  };
+
+  /**
+   * grpc.method_type tag.
+   */
+  static final Tag<MethodDescriptor> GRPC_METHOD_TYPE = new AbstractTag<MethodDescriptor>("grpc.method_type") {
+    @Override
+    public void set(Span span, MethodDescriptor method) {
+      if (method != null) {
+        span.setTag(super.key, method.getType().toString());
+      }
+    }
+  };
+
+  /**
+   * grpc.status tag.
+   */
+  static final Tag<Status> GRPC_STATUS = new AbstractTag<Status>("grpc.status") {
+    @Override
+    public void set(Span span, Status status) {
+      if (status != null) {
+        span.setTag(super.key, status.getCode().name());
+      }
+    }
+  };
+
+  /**
+   * peer.address tag.
+   */
+  static final Tag<Attributes> PEER_ADDRESS = new AbstractTag<Attributes>("peer.address") {
+    @Override
+    public void set(Span span, Attributes attributes) {
+      SocketAddress address = attributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
+      if (address instanceof InProcessSocketAddress) {
+        span.setTag(super.key, ((InProcessSocketAddress) address).getName());
+      } else if (address instanceof InetSocketAddress) {
+        final InetSocketAddress inetAddress = (InetSocketAddress) address;
+        span.setTag(super.key, inetAddress.getHostString() + ':' + inetAddress.getPort());
+      }
+    }
+  };
+
+  /**
+   * Value for {@link Tags#COMPONENT} for gRPC.
+   */
+  static final String COMPONENT_NAME = "java-grpc";
+
+  static class NullableTag<T> extends AbstractTag<T> {
+
+    NullableTag(String tagKey) {
+      super(tagKey);
+    }
+
+    @Override
+    public void set(Span span, T tagValue) {
+      if (tagValue != null) {
+        span.setTag(super.key, tagValue.toString());
+      }
     }
   }
 }

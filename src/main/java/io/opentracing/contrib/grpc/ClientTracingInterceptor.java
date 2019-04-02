@@ -38,7 +38,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /**
@@ -144,27 +143,22 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       for (ClientRequestAttribute attr : this.tracedAttributes) {
         switch (attr) {
           case ALL_CALL_OPTIONS:
-            span.setTag(attr.key, callOptions.toString());
+            GrpcTags.GRPC_CALL_OPTIONS.set(span, callOptions);
             break;
           case AUTHORITY:
-            span.setTag(attr.key, String.valueOf(callOptions.getAuthority()));
+            GrpcTags.GRPC_AUTHORITY.set(span, callOptions.getAuthority());
             break;
           case COMPRESSOR:
-            span.setTag(attr.key, String.valueOf(callOptions.getCompressor()));
+            GrpcTags.GRPC_COMPRESSOR.set(span, callOptions.getCompressor());
             break;
           case DEADLINE:
-            if (callOptions.getDeadline() == null) {
-              span.setTag(attr.key, "null");
-            } else {
-              span.setTag(attr.key,
-                  callOptions.getDeadline().timeRemaining(TimeUnit.MILLISECONDS));
-            }
+            GrpcTags.GRPC_DEADLINE.set(span, callOptions.getDeadline());
             break;
           case METHOD_NAME:
-            span.setTag(attr.key, method.getFullMethodName());
+            GrpcTags.GRPC_METHOD_NAME.set(span, method);
             break;
           case METHOD_TYPE:
-            span.setTag(attr.key, String.valueOf(method.getType()));
+            GrpcTags.GRPC_METHOD_TYPE.set(span, method);
             break;
           case HEADERS:
             break;
@@ -180,7 +174,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             span.log("Started call");
           }
           if (tracedAttributes.contains(ClientRequestAttribute.HEADERS)) {
-            span.setTag(ClientRequestAttribute.HEADERS.key, headers.toString());
+            GrpcTags.GRPC_HEADERS.set(span, headers);
           }
 
           tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new TextMap() {
@@ -227,7 +221,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                   span.log(ImmutableMap.of("Call failed", status.getDescription()));
                 }
               }
-              GrpcTags.setStatusTags(span, status);
+              GrpcTags.GRPC_STATUS.set(span, status);
               if (clientCloseDecorator != null) {
                 clientCloseDecorator.close(span, status, trailers);
               }
@@ -453,21 +447,12 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   }
 
   public enum ClientRequestAttribute {
-    METHOD_TYPE("grpc.method_type"),
-    METHOD_NAME("grpc.method_name"),
-    DEADLINE("grpc.deadline_millis"),
-    COMPRESSOR("grpc.compressor"),
-    AUTHORITY("grpc.authority"),
-    ALL_CALL_OPTIONS("grpc.call_options"),
-    HEADERS("grpc.headers");
-
-    /**
-     * The Span tag key for this attribute
-     */
-    final String key;
-
-    ClientRequestAttribute(String key) {
-      this.key = key;
-    }
+    METHOD_TYPE,
+    METHOD_NAME,
+    DEADLINE,
+    COMPRESSOR,
+    AUTHORITY,
+    ALL_CALL_OPTIONS,
+    HEADERS
   }
 }

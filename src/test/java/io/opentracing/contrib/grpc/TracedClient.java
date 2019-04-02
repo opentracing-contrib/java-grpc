@@ -13,26 +13,36 @@
  */
 package io.opentracing.contrib.grpc;
 
+import io.grpc.Channel;
 import io.grpc.ClientInterceptor;
 import io.grpc.ClientInterceptors;
 import io.grpc.ManagedChannel;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
+import java.util.concurrent.TimeUnit;
 
 public class TracedClient {
 
   private final GreeterGrpc.GreeterBlockingStub blockingStub;
 
   public TracedClient(ManagedChannel channel) {
-    blockingStub = GreeterGrpc.newBlockingStub(channel);
+    blockingStub = createStub(channel);
   }
 
   public TracedClient(ManagedChannel channel, ClientInterceptor... interceptors) {
-    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors));
+    blockingStub = createStub(ClientInterceptors.intercept(channel, interceptors));
+  }
+
+  private GreeterGrpc.GreeterBlockingStub createStub(Channel channel) {
+    return GreeterGrpc.newBlockingStub(channel)
+        .withDeadlineAfter(500, TimeUnit.MILLISECONDS)
+        .withCompression("gzip");
   }
 
   boolean greet(String name) {
-    HelloRequest request = HelloRequest.newBuilder().setName(name).build();
+    HelloRequest request = HelloRequest.newBuilder()
+        .setName(name)
+        .build();
     try {
       blockingStub.sayHello(request);
     } catch (Exception e) {
