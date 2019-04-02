@@ -29,6 +29,7 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
+import io.opentracing.log.Fields;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
@@ -171,7 +172,10 @@ public class ClientTracingInterceptor implements ClientInterceptor {
         @Override
         public void start(Listener<RespT> responseListener, final Metadata headers) {
           if (verbose) {
-            span.log("Started call");
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_START)
+                .put(Fields.MESSAGE, "Client call started")
+                .build());
           }
           if (tracedAttributes.contains(ClientRequestAttribute.HEADERS)) {
             GrpcTags.GRPC_HEADERS.set(span, headers);
@@ -197,7 +201,11 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             @Override
             public void onHeaders(Metadata headers) {
               if (verbose) {
-                span.log(ImmutableMap.of("Response headers received", headers.toString()));
+                span.log(ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_HEADERS)
+                    .put(Fields.MESSAGE, "Client received response headers")
+                    .put(GrpcFields.HEADERS, headers.toString())
+                    .build());
               }
               delegate().onHeaders(headers);
             }
@@ -205,7 +213,10 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             @Override
             public void onMessage(RespT message) {
               if (streaming || verbose) {
-                span.log("Response received");
+                span.log(ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE)
+                    .put(Fields.MESSAGE, "Client received response message")
+                    .build());
               }
               delegate().onMessage(message);
             }
@@ -213,12 +224,22 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             @Override
             public void onClose(Status status, Metadata trailers) {
               if (verbose) {
-                if (status.getCode().value() == 0) {
-                  span.log("Call closed");
-                } else if (status.getDescription() == null) {
-                  span.log(ImmutableMap.of("Call failed", "null"));
+                if (status.getCode() == Status.Code.OK) {
+                  span.log(ImmutableMap.<String, Object>builder()
+                      .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
+                      .put(Fields.MESSAGE, "Client call closed")
+                      .build());
                 } else {
-                  span.log(ImmutableMap.of("Call failed", status.getDescription()));
+                  ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
+                      .put(Fields.EVENT, GrpcFields.ERROR)
+                      .put(Fields.ERROR_KIND, status.getCode());
+                  Throwable cause = status.getCause();
+                  if (cause != null) {
+                    builder.put(Fields.ERROR_OBJECT, cause);
+                  }
+                  String description = status.getDescription();
+                  builder.put(Fields.MESSAGE, description != null ? description : "Client call failed");
+                  span.log(builder.build());
                 }
               }
               GrpcTags.GRPC_STATUS.set(span, status);
@@ -245,16 +266,17 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
-          String errorMessage;
-          if (message == null) {
-            errorMessage = "Error";
-          } else {
-            errorMessage = message;
-          }
-          if (cause == null) {
-            span.log(errorMessage);
-          } else {
-            span.log(ImmutableMap.of(errorMessage, cause.getMessage()));
+          if (verbose) {
+            ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+            if (cause != null) {
+              builder
+                  .put(Fields.EVENT, GrpcFields.ERROR)
+                  .put(Fields.ERROR_OBJECT, cause);
+            } else {
+              builder.put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL);
+            }
+            builder.put(Fields.MESSAGE, message != null ? message : "Client call canceled");
+            span.log(builder.build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().cancel(message, cause);
@@ -263,8 +285,11 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
         @Override
         public void halfClose() {
-          if (streaming) {
-            span.log("Finished sending messages");
+          if (streaming || verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_HALF_CLOSE)
+                .put(Fields.MESSAGE, "Client sent all messages")
+                .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().halfClose();
@@ -274,7 +299,10 @@ public class ClientTracingInterceptor implements ClientInterceptor {
         @Override
         public void sendMessage(ReqT message) {
           if (streaming || verbose) {
-            span.log("Message sent");
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
+                .put(Fields.MESSAGE, "Client sent message")
+                .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().sendMessage(message);

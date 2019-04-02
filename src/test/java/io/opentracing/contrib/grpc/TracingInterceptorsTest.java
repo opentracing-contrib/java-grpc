@@ -28,6 +28,7 @@ import io.grpc.ServerCall;
 import io.grpc.Status;
 import io.grpc.testing.GrpcServerRule;
 import io.opentracing.Span;
+import io.opentracing.log.Fields;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
 import io.opentracing.tag.Tags;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class TracingInterceptorsTest {
 
@@ -166,7 +168,18 @@ public class TracingInterceptorsTest {
     assertEquals("span should have default name", span.operationName(),
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    assertEquals("span should log onMessage and onComplete", 2, span.logEntries().size());
+    Assertions.assertThat(
+        span.logEntries().stream()
+            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
+            .collect(Collectors.toList()))
+        .as("span should contain verbose log fields")
+        .contains(
+            GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
+            GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE,
+            GrpcFields.SERVER_CALL_SEND_HEADERS,
+            GrpcFields.SERVER_CALL_SEND_MESSAGE,
+            GrpcFields.SERVER_CALL_CLOSE,
+            GrpcFields.SERVER_CALL_LISTENER_ON_COMPLETE);
     Assertions.assertThat(span.tags()).as("span should have base server tags")
         .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
@@ -194,7 +207,15 @@ public class TracingInterceptorsTest {
     assertEquals("span should have default name", span.operationName(),
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    assertEquals("span should log onMessage and onHalfClose", span.logEntries().size(), 2);
+    Assertions.assertThat(
+        span.logEntries().stream()
+            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
+            .collect(Collectors.toList()))
+        .as("span should contain streaming log fields")
+        .contains(
+            GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
+            GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE,
+            GrpcFields.SERVER_CALL_SEND_MESSAGE);
     Assertions.assertThat(span.tags()).as("span should have base server tags")
         .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
@@ -395,8 +416,18 @@ public class TracingInterceptorsTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     System.out.println(span.logEntries());
-    assertEquals("span should have logs for start, onHeaders, onMessage, onClose, sendMessage", 5,
-        span.logEntries().size());
+    Assertions.assertThat(
+        span.logEntries().stream()
+            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
+            .collect(Collectors.toList()))
+        .as("span should contain verbose log fields")
+        .contains(
+            GrpcFields.CLIENT_CALL_START,
+            GrpcFields.CLIENT_CALL_SEND_MESSAGE,
+            GrpcFields.CLIENT_CALL_HALF_CLOSE,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_HEADERS,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE);
     Assertions.assertThat(span.tags()).as("span should have base client tags")
         .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
@@ -420,8 +451,15 @@ public class TracingInterceptorsTest {
     MockSpan span = clientTracer.finishedSpans().get(0);
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    assertEquals("span should have log for onMessage, halfClose, sendMessage", 3,
-        span.logEntries().size());
+    Assertions.assertThat(
+        span.logEntries().stream()
+            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
+            .collect(Collectors.toList()))
+        .as("span should contain streaming log fields")
+        .contains(
+            GrpcFields.CLIENT_CALL_SEND_MESSAGE,
+            GrpcFields.CLIENT_CALL_HALF_CLOSE,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE);
     Assertions.assertThat(span.tags()).as("span should have base client tags")
         .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",

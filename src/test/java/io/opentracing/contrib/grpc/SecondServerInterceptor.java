@@ -24,7 +24,6 @@ import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.Status;
-import io.opentracing.Span;
 import io.opentracing.mock.MockTracer;
 
 public class SecondServerInterceptor implements ServerInterceptor {
