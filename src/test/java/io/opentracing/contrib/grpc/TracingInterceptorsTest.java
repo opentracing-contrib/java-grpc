@@ -39,11 +39,12 @@ import org.assertj.core.data.MapEntry;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 public class TracingInterceptorsTest {
 
@@ -168,10 +169,11 @@ public class TracingInterceptorsTest {
     assertEquals("span should have default name", span.operationName(),
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    Assertions.assertThat(
-        span.logEntries().stream()
-            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
-            .collect(Collectors.toList()))
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
         .as("span should contain verbose log fields")
         .contains(
             GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
@@ -207,10 +209,11 @@ public class TracingInterceptorsTest {
     assertEquals("span should have default name", span.operationName(),
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    Assertions.assertThat(
-        span.logEntries().stream()
-            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
-            .collect(Collectors.toList()))
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
         .as("span should contain streaming log fields")
         .contains(
             GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
@@ -416,10 +419,11 @@ public class TracingInterceptorsTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     System.out.println(span.logEntries());
-    Assertions.assertThat(
-        span.logEntries().stream()
-            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
-            .collect(Collectors.toList()))
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
         .as("span should contain verbose log fields")
         .contains(
             GrpcFields.CLIENT_CALL_START,
@@ -451,10 +455,11 @@ public class TracingInterceptorsTest {
     MockSpan span = clientTracer.finishedSpans().get(0);
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    Assertions.assertThat(
-        span.logEntries().stream()
-            .map(logEntry -> (String) logEntry.fields().get(Fields.EVENT))
-            .collect(Collectors.toList()))
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
         .as("span should contain streaming log fields")
         .contains(
             GrpcFields.CLIENT_CALL_SEND_MESSAGE,
