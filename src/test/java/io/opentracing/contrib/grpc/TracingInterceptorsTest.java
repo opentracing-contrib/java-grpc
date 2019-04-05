@@ -28,27 +28,30 @@ import io.grpc.ServerCall;
 import io.grpc.Status;
 import io.grpc.testing.GrpcServerRule;
 import io.opentracing.Span;
+import io.opentracing.log.Fields;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import io.opentracing.util.GlobalTracerTestUtil;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.data.MapEntry;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 public class TracingInterceptorsTest {
 
-  private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>of(
-      Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME,
-      GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name()
-  );
+  private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>builder()
+      .put(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
+      .put(GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name())
+      .build();
 
   private static final Map<String, Object> BASE_SERVER_TAGS = ImmutableMap.<String, Object>builder()
       .putAll(BASE_TAGS)
@@ -60,16 +63,22 @@ public class TracingInterceptorsTest {
       .put(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
       .build();
 
-  private static final Set<String> CLIENT_ATTRIBUTE_TAGS;
+  private static final Set<String> CLIENT_ATTRIBUTE_TAGS = ImmutableSet.of(
+      GrpcTags.GRPC_CALL_OPTIONS.getKey(),
+      //TODO: @ExperimentalApi("https://github.com/grpc/grpc-java/issues/1767")
+      //GrpcTags.GRPC_AUTHORITY.getKey(),
+      GrpcTags.GRPC_COMPRESSOR.getKey(),
+      GrpcTags.GRPC_DEADLINE.getKey(),
+      GrpcTags.GRPC_METHOD_NAME.getKey(),
+      GrpcTags.GRPC_METHOD_TYPE.getKey(),
+      GrpcTags.GRPC_HEADERS.getKey());
 
-  static {
-    final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-    for (ClientTracingInterceptor.ClientRequestAttribute attribute : ClientTracingInterceptor.ClientRequestAttribute
-        .values()) {
-      builder.add(attribute.key);
-    }
-    CLIENT_ATTRIBUTE_TAGS = builder.build();
-  }
+  private static final Set<String> SERVER_ATTRIBUTE_TAGS = ImmutableSet.of(
+      GrpcTags.GRPC_METHOD_TYPE.getKey(),
+      GrpcTags.GRPC_METHOD_NAME.getKey(),
+      GrpcTags.GRPC_CALL_ATTRIBUTES.getKey(),
+      GrpcTags.GRPC_HEADERS.getKey(),
+      GrpcTags.PEER_ADDRESS.getKey());
 
   private final MockTracer clientTracer = new MockTracer();
   private final MockTracer serverTracer = new MockTracer();
@@ -89,11 +98,11 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerBasic() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -114,13 +123,13 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerTwoInterceptors() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
 
-    service.addGreeterServiceWithTwoInterceptors(tracingInterceptor, secondServerInterceptor,
-        grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(
+        grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -141,14 +150,14 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithVerbosity() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withVerbosity()
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -160,7 +169,19 @@ public class TracingInterceptorsTest {
     assertEquals("span should have default name", span.operationName(),
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    assertEquals("span should log onMessage and onComplete", 2, span.logEntries().size());
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
+        .as("span should contain verbose log fields")
+        .contains(
+            GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
+            GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE,
+            GrpcFields.SERVER_CALL_SEND_HEADERS,
+            GrpcFields.SERVER_CALL_SEND_MESSAGE,
+            GrpcFields.SERVER_CALL_CLOSE,
+            GrpcFields.SERVER_CALL_LISTENER_ON_COMPLETE);
     Assertions.assertThat(span.tags()).as("span should have base server tags")
         .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
@@ -169,14 +190,14 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithStreaming() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withStreaming()
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -188,7 +209,16 @@ public class TracingInterceptorsTest {
     assertEquals("span should have default name", span.operationName(),
         "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    assertEquals("span should log onMessage and onHalfClose", span.logEntries().size(), 2);
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
+        .as("span should contain streaming log fields")
+        .contains(
+            GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
+            GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE,
+            GrpcFields.SERVER_CALL_SEND_MESSAGE);
     Assertions.assertThat(span.tags()).as("span should have base server tags")
         .isEqualTo(BASE_SERVER_TAGS);
     assertFalse("span should have no baggage",
@@ -198,7 +228,7 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedServerWithCustomOperationName() {
     final String PREFIX = "testing-";
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -210,7 +240,7 @@ public class TracingInterceptorsTest {
         })
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -231,14 +261,14 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithTracedAttributes() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.values())
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -252,16 +282,16 @@ public class TracingInterceptorsTest {
     assertEquals("span should have no logs", span.logEntries().size(), 0);
     Assertions.assertThat(span.tags()).as("span should have base server tags")
         .containsAllEntriesOf(BASE_SERVER_TAGS);
-    Assertions.assertThat(span.tags()).as("span should have a tag for each traced attribute")
-        .hasSize(ServerTracingInterceptor.ServerRequestAttribute.values().length + BASE_SERVER_TAGS
-            .size());
+    Assertions.assertThat(span.tags().keySet())
+        .as("span should have tags for all server request attributes")
+        .containsAll(SERVER_ATTRIBUTE_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
 
   @Test
   public void testTracedServerWithServerSpanDecorator() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
     ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
       @Override
       public void interceptCall(Span span, ServerCall call, Metadata headers) {
@@ -278,7 +308,7 @@ public class TracingInterceptorsTest {
         .withServerSpanDecorator(serverSpanDecorator)
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -302,7 +332,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedServerWithServerCloseDecorator() {
-    TracedClient client = new TracedClient(grpcServer.getChannel(), null);
+    TracedClient client = new TracedClient(grpcServer.getChannel());
     ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
@@ -315,7 +345,7 @@ public class TracingInterceptorsTest {
         .withServerCloseDecorator(serverCloseDecorator)
         .build();
 
-    service.addGreeterServiceWithInterceptor(tracingInterceptor, grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
 
@@ -330,7 +360,6 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientBasic() {
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
@@ -351,8 +380,29 @@ public class TracingInterceptorsTest {
   }
 
   @Test
-  public void testTracedClientWithVerbosity() {
+  public void testTracedClientTwoInterceptors() {
+    SecondClientInterceptor secondClientInterceptor = new SecondClientInterceptor(clientTracer);
+    ClientTracingInterceptor clientTracingInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), secondClientInterceptor, clientTracingInterceptor);
 
+    service.addGreeterService(grpcServer.getServiceRegistry());
+
+    assertTrue("call should complete", client.greet("world"));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void testTracedClientWithVerbosity() {
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withVerbosity()
@@ -369,8 +419,19 @@ public class TracingInterceptorsTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     System.out.println(span.logEntries());
-    assertEquals("span should have logs for start, onHeaders, onMessage, onClose, sendMessage", 5,
-        span.logEntries().size());
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
+        .as("span should contain verbose log fields")
+        .contains(
+            GrpcFields.CLIENT_CALL_START,
+            GrpcFields.CLIENT_CALL_SEND_MESSAGE,
+            GrpcFields.CLIENT_CALL_HALF_CLOSE,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_HEADERS,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE);
     Assertions.assertThat(span.tags()).as("span should have base client tags")
         .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
@@ -379,7 +440,6 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientWithStreaming() {
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withStreaming()
@@ -395,8 +455,16 @@ public class TracingInterceptorsTest {
     MockSpan span = clientTracer.finishedSpans().get(0);
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    assertEquals("span should have log for onMessage, halfClose, sendMessage", 3,
-        span.logEntries().size());
+    List<String> events = new ArrayList<>(span.logEntries().size());
+    for (MockSpan.LogEntry logEntry : span.logEntries()) {
+      events.add((String) logEntry.fields().get(Fields.EVENT));
+    }
+    Assertions.assertThat(events)
+        .as("span should contain streaming log fields")
+        .contains(
+            GrpcFields.CLIENT_CALL_SEND_MESSAGE,
+            GrpcFields.CLIENT_CALL_HALF_CLOSE,
+            GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE);
     Assertions.assertThat(span.tags()).as("span should have base client tags")
         .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
@@ -437,7 +505,6 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientWithTracedAttributes() {
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
@@ -538,8 +605,7 @@ public class TracingInterceptorsTest {
 
     ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
-    service.addGreeterServiceWithInterceptor(serverTracingInterceptor,
-        grpcServer.getServiceRegistry());
+    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), serverTracingInterceptor);
 
     assertTrue("call should complete", client.greet("world"));
     assertEquals("a client span should have been created for the request",

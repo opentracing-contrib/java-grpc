@@ -13,6 +13,7 @@
  */
 package io.opentracing.contrib.grpc;
 
+import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
@@ -27,16 +28,11 @@ public class TracedService {
     registry.addService(new GreeterImpl());
   }
 
-  void addGreeterServiceWithInterceptor(ServerTracingInterceptor tracingInterceptor,
-      MutableHandlerRegistry registry) {
-    registry.addService(ServerInterceptors.intercept(new GreeterImpl(), tracingInterceptor));
-  }
+  void addGreeterServiceWithInterceptors(
+      MutableHandlerRegistry registry,
+      ServerInterceptor... interceptors) {
 
-  void addGreeterServiceWithTwoInterceptors(ServerTracingInterceptor tracingInterceptor,
-      SecondServerInterceptor secondServerInterceptor,
-      MutableHandlerRegistry registry) {
-    registry.addService(ServerInterceptors
-        .intercept(new GreeterImpl(), secondServerInterceptor, tracingInterceptor));
+    registry.addService(ServerInterceptors.intercept(new GreeterImpl(), interceptors));
   }
 
   private class GreeterImpl extends GreeterGrpc.GreeterImplBase {
@@ -51,7 +47,6 @@ public class TracedService {
       HelloReply reply = HelloReply.newBuilder().setMessage("Hello").build();
       responseObserver.onNext(reply);
       responseObserver.onCompleted();
-
     }
   }
 }

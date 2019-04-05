@@ -14,6 +14,7 @@
 package io.opentracing.contrib.grpc;
 
 import com.google.common.collect.ImmutableMap;
+import io.grpc.Attributes;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
@@ -24,9 +25,11 @@ import io.grpc.ForwardingClientCallListener;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
+import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
+import io.opentracing.log.Fields;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
@@ -36,7 +39,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /**
@@ -126,148 +128,209 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method,
       CallOptions callOptions,
-      Channel next
-  ) {
+      Channel next) {
+
     final String operationName = operationNameConstructor.constructOperationName(method);
 
     SpanContext activeSpanContext = getActiveSpanContext();
     final Span span = createSpanFromParent(activeSpanContext, operationName);
 
-    if (clientSpanDecorator != null) {
-      clientSpanDecorator.interceptCall(span, method, callOptions);
-    }
+    try (Scope ignored = tracer.scopeManager().activate(span)) {
 
-    for (ClientRequestAttribute attr : this.tracedAttributes) {
-      switch (attr) {
-        case ALL_CALL_OPTIONS:
-          span.setTag(attr.key, callOptions.toString());
-          break;
-        case AUTHORITY:
-          span.setTag(attr.key, String.valueOf(callOptions.getAuthority()));
-          break;
-        case COMPRESSOR:
-          span.setTag(attr.key, String.valueOf(callOptions.getCompressor()));
-          break;
-        case DEADLINE:
-          if (callOptions.getDeadline() == null) {
-            span.setTag(attr.key, "null");
-          } else {
-            span.setTag(attr.key,
-                callOptions.getDeadline().timeRemaining(TimeUnit.MILLISECONDS));
-          }
-          break;
-        case METHOD_NAME:
-          span.setTag(attr.key, method.getFullMethodName());
-          break;
-        case METHOD_TYPE:
-          span.setTag(attr.key, String.valueOf(method.getType()));
-          break;
-        case HEADERS:
-          break;
+      if (clientSpanDecorator != null) {
+        clientSpanDecorator.interceptCall(span, method, callOptions);
       }
-    }
 
-    return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
-        next.newCall(method, callOptions)) {
-
-      @Override
-      public void start(Listener<RespT> responseListener, final Metadata headers) {
-        if (verbose) {
-          span.log("Started call");
+      for (ClientRequestAttribute attr : this.tracedAttributes) {
+        switch (attr) {
+          case ALL_CALL_OPTIONS:
+            GrpcTags.GRPC_CALL_OPTIONS.set(span, callOptions);
+            break;
+          case AUTHORITY:
+            GrpcTags.GRPC_AUTHORITY.set(span, callOptions.getAuthority());
+            break;
+          case COMPRESSOR:
+            GrpcTags.GRPC_COMPRESSOR.set(span, callOptions.getCompressor());
+            break;
+          case DEADLINE:
+            GrpcTags.GRPC_DEADLINE.set(span, callOptions.getDeadline());
+            break;
+          case METHOD_NAME:
+            GrpcTags.GRPC_METHOD_NAME.set(span, method);
+            break;
+          case METHOD_TYPE:
+            GrpcTags.GRPC_METHOD_TYPE.set(span, method);
+            break;
+          case HEADERS:
+            break;
         }
-        if (tracedAttributes.contains(ClientRequestAttribute.HEADERS)) {
-          span.setTag(ClientRequestAttribute.HEADERS.key, headers.toString());
-        }
+      }
 
-        tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new TextMap() {
-          @Override
-          public void put(String key, String value) {
-            Metadata.Key<String> headerKey = Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER);
-            headers.put(headerKey, value);
+      return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
+          next.newCall(method, callOptions)) {
+
+        @Override
+        public void start(Listener<RespT> responseListener, final Metadata headers) {
+          if (verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_START)
+                .put(Fields.MESSAGE, "Client call started")
+                .build());
+          }
+          if (tracedAttributes.contains(ClientRequestAttribute.HEADERS)) {
+            GrpcTags.GRPC_HEADERS.set(span, headers);
           }
 
-          @Override
-          public Iterator<Entry<String, String>> iterator() {
-            throw new UnsupportedOperationException(
-                "TextMapInjectAdapter should only be used with Tracer.inject()");
-          }
-        });
-
-        Listener<RespT> tracingResponseListener = new ForwardingClientCallListener
-            .SimpleForwardingClientCallListener<RespT>(responseListener) {
-
-          @Override
-          public void onHeaders(Metadata headers) {
-            if (verbose) {
-              span.log(ImmutableMap.of("Response headers received", headers.toString()));
+          tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new TextMap() {
+            @Override
+            public void put(String key, String value) {
+              Metadata.Key<String> headerKey = Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER);
+              headers.put(headerKey, value);
             }
-            delegate().onHeaders(headers);
-          }
 
-          @Override
-          public void onMessage(RespT message) {
-            if (streaming || verbose) {
-              span.log("Response received");
+            @Override
+            public Iterator<Entry<String, String>> iterator() {
+              throw new UnsupportedOperationException(
+                  "TextMapInjectAdapter should only be used with Tracer.inject()");
             }
-            delegate().onMessage(message);
-          }
+          });
 
-          @Override
-          public void onClose(Status status, Metadata trailers) {
-            if (verbose) {
-              if (status.getCode().value() == 0) {
-                span.log("Call closed");
-              } else {
-                if (status.getDescription() == null) {
-                  span.log(ImmutableMap.of("Call failed", "null"));
+          Listener<RespT> tracingResponseListener = new ForwardingClientCallListener
+              .SimpleForwardingClientCallListener<RespT>(responseListener) {
+
+            @Override
+            public void onHeaders(Metadata headers) {
+              if (verbose) {
+                span.log(ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_HEADERS)
+                    .put(Fields.MESSAGE, "Client received response headers")
+                    .put(GrpcFields.HEADERS, headers.toString())
+                    .build());
+              }
+              delegate().onHeaders(headers);
+            }
+
+            @Override
+            public void onMessage(RespT message) {
+              if (streaming || verbose) {
+                span.log(ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE)
+                    .put(Fields.MESSAGE, "Client received response message")
+                    .build());
+              }
+              delegate().onMessage(message);
+            }
+
+            @Override
+            public void onClose(Status status, Metadata trailers) {
+              if (verbose) {
+                if (status.getCode() == Status.Code.OK) {
+                  span.log(ImmutableMap.<String, Object>builder()
+                      .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
+                      .put(Fields.MESSAGE, "Client call closed")
+                      .build());
                 } else {
-                  span.log(ImmutableMap.of("Call failed", status.getDescription()));
+                  ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
+                      .put(Fields.EVENT, GrpcFields.ERROR)
+                      .put(Fields.ERROR_KIND, status.getCode());
+                  Throwable cause = status.getCause();
+                  if (cause != null) {
+                    builder.put(Fields.ERROR_OBJECT, cause);
+                  }
+                  String description = status.getDescription();
+                  builder.put(Fields.MESSAGE, description != null ? description : "Client call failed");
+                  span.log(builder.build());
                 }
               }
+              GrpcTags.GRPC_STATUS.set(span, status);
+              if (clientCloseDecorator != null) {
+                clientCloseDecorator.close(span, status, trailers);
+              }
+              delegate().onClose(status, trailers);
+              span.finish();
             }
-            GrpcTags.setStatusTags(span, status);
-            if (clientCloseDecorator != null) {
-              clientCloseDecorator.close(span, status, trailers);
-            }
-            span.finish();
-            delegate().onClose(status, trailers);
+          };
+
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().start(tracingResponseListener, headers);
           }
-        };
-        delegate().start(tracingResponseListener, headers);
-      }
+        }
 
-      @Override
-      public void cancel(@Nullable String message, @Nullable Throwable cause) {
-        String errorMessage;
-        if (message == null) {
-          errorMessage = "Error";
-        } else {
-          errorMessage = message;
+        @Override
+        public void request(int numMessages) {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().request(numMessages);
+          }
         }
-        if (cause == null) {
-          span.log(errorMessage);
-        } else {
-          span.log(ImmutableMap.of(errorMessage, cause.getMessage()));
-        }
-        delegate().cancel(message, cause);
-      }
 
-      @Override
-      public void halfClose() {
-        if (streaming) {
-          span.log("Finished sending messages");
-        }
-        delegate().halfClose();
-      }
 
-      @Override
-      public void sendMessage(ReqT message) {
-        if (streaming || verbose) {
-          span.log("Message sent");
+        @Override
+        public void cancel(@Nullable String message, @Nullable Throwable cause) {
+          if (verbose) {
+            ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+            if (cause != null) {
+              builder
+                  .put(Fields.EVENT, GrpcFields.ERROR)
+                  .put(Fields.ERROR_OBJECT, cause);
+            } else {
+              builder.put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL);
+            }
+            builder.put(Fields.MESSAGE, message != null ? message : "Client call canceled");
+            span.log(builder.build());
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().cancel(message, cause);
+          }
         }
-        delegate().sendMessage(message);
-      }
-    };
+
+        @Override
+        public void halfClose() {
+          if (streaming || verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_HALF_CLOSE)
+                .put(Fields.MESSAGE, "Client sent all messages")
+                .build());
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().halfClose();
+          }
+        }
+
+        @Override
+        public void sendMessage(ReqT message) {
+          if (streaming || verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
+                .put(Fields.MESSAGE, "Client sent message")
+                .build());
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().sendMessage(message);
+          }
+        }
+
+        @Override
+        public boolean isReady() {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            return delegate().isReady();
+          }
+        }
+
+        @Override
+        public void setMessageCompression(boolean enabled) {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().setMessageCompression(enabled);
+          }
+        }
+
+        @Override
+        public Attributes getAttributes() {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            return delegate().getAttributes();
+          }
+        }
+      };
+    }
   }
 
   private Span createSpanFromParent(SpanContext parentSpanContext, String operationName) {
@@ -277,7 +340,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     } else {
       spanBuilder = tracer.buildSpan(operationName).asChildOf(parentSpanContext);
     }
-    return spanBuilder.withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
+    return spanBuilder
+        .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
         .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
         .start();
   }
@@ -411,21 +475,12 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   }
 
   public enum ClientRequestAttribute {
-    METHOD_TYPE("grpc.method_type"),
-    METHOD_NAME("grpc.method_name"),
-    DEADLINE("grpc.deadline_millis"),
-    COMPRESSOR("grpc.compressor"),
-    AUTHORITY("grpc.authority"),
-    ALL_CALL_OPTIONS("grpc.call_options"),
-    HEADERS("grpc.headers");
-
-    /**
-     * The Span tag key for this attribute
-     */
-    final String key;
-
-    ClientRequestAttribute(String key) {
-      this.key = key;
-    }
+    METHOD_TYPE,
+    METHOD_NAME,
+    DEADLINE,
+    COMPRESSOR,
+    AUTHORITY,
+    ALL_CALL_OPTIONS,
+    HEADERS
   }
 }
