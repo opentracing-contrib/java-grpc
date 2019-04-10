@@ -205,22 +205,12 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             @Override
             public void onClose(Status status, Metadata trailers) {
               if (verbose) {
-                if (status.getCode() == Status.Code.OK) {
-                  span.log(ImmutableMap.<String, Object>builder()
-                      .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
-                      .put(Fields.MESSAGE, "Client call closed")
-                      .build());
-                } else {
-                  ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
-                      .put(Fields.EVENT, GrpcFields.ERROR)
-                      .put(Fields.ERROR_KIND, status.getCode());
-                  Throwable cause = status.getCause();
-                  if (cause != null) {
-                    builder.put(Fields.ERROR_OBJECT, cause);
-                  }
-                  String description = status.getDescription();
-                  builder.put(Fields.MESSAGE, description != null ? description : "Client call failed");
-                  span.log(builder.build());
+                span.log(ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
+                    .put(Fields.MESSAGE, "Client call closed")
+                    .build());
+                if (!status.isOk()) {
+                  GrpcFields.logClientCallError(span, status.getDescription(), status.getCause());
                 }
               }
               GrpcTags.GRPC_STATUS.set(span, status);
@@ -244,20 +234,14 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           }
         }
 
-
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
           if (verbose) {
-            ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-            if (cause != null) {
-              builder
-                  .put(Fields.EVENT, GrpcFields.ERROR)
-                  .put(Fields.ERROR_OBJECT, cause);
-            } else {
-              builder.put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL);
-            }
-            builder.put(Fields.MESSAGE, message != null ? message : "Client call canceled");
-            span.log(builder.build());
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL)
+                .put(Fields.MESSAGE, "Client call canceled")
+                .build());
+            GrpcFields.logClientCallError(span, message, cause);
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().cancel(message, cause);

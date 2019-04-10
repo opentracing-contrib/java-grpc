@@ -190,22 +190,12 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         @Override
         public void close(Status status, Metadata trailers) {
           if (verbose) {
-            if (status.getCode() == Status.Code.OK) {
-              span.log(ImmutableMap.<String, Object>builder()
-                  .put(Fields.EVENT, GrpcFields.SERVER_CALL_CLOSE)
-                  .put(Fields.MESSAGE, "Server call closed")
-                  .build());
-            } else {
-              ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
-                  .put(Fields.EVENT, GrpcFields.ERROR)
-                  .put(Fields.ERROR_KIND, status.getCode());
-              Throwable cause = status.getCause();
-              if (cause != null) {
-                builder.put(Fields.ERROR_OBJECT, cause);
-              }
-              String description = status.getDescription();
-              builder.put(Fields.MESSAGE, description != null ? description : "Server call failed");
-              span.log(builder.build());
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.SERVER_CALL_CLOSE)
+                .put(Fields.MESSAGE, "Server call closed")
+                .build());
+            if (!status.isOk()) {
+              GrpcFields.logServerCallError(span, status.getDescription(), status.getCause());
             }
           }
           GrpcTags.GRPC_STATUS.set(span, status);
