@@ -247,6 +247,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .put(Fields.MESSAGE, "Server call cancelled")
                 .build());
           }
+          GrpcTags.GRPC_STATUS.set(span, Status.CANCELLED);
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onCancel();
           } finally {
@@ -262,6 +263,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .put(Fields.MESSAGE, "Server call completed")
                 .build());
           }
+          // Server span may complete with non-OK ServerCall.close(status).
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onComplete();
           } finally {

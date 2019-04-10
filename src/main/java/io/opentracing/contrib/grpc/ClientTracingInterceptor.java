@@ -243,6 +243,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 .build());
             GrpcFields.logClientCallError(span, message, cause);
           }
+          Status status = cause == null ? Status.UNKNOWN : Status.fromThrowable(cause);
+          GrpcTags.GRPC_STATUS.set(span, status.withDescription(message));
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().cancel(message, cause);
           }

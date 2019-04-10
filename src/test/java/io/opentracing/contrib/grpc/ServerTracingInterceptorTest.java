@@ -43,7 +43,6 @@ import io.opentracing.propagation.TextMapAdapter;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracerTestUtil;
 import org.assertj.core.api.Assertions;
-import org.assertj.core.data.MapEntry;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -295,7 +294,7 @@ public class ServerTracingInterceptorTest {
     Assertions.assertThat(span.tags()).as("span should have 3 tags added in the decorator")
         .hasSize(3 + BASE_SERVER_TAGS.size());
     Assertions.assertThat(span.tags()).as("span contains added tags")
-        .contains(MapEntry.entry("test_tag", "test_value"))
+        .containsEntry("test_tag", "test_value")
         .containsKeys("tag_from_call", "tag_from_headers");
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
@@ -306,7 +305,7 @@ public class ServerTracingInterceptorTest {
     ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
-        span.setTag("grpc.statusCode", status.getCode().value());
+        span.setTag("some_tag", "some_value");
       }
     };
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
@@ -323,7 +322,7 @@ public class ServerTracingInterceptorTest {
 
     MockSpan span = serverTracer.finishedSpans().get(0);
     Assertions.assertThat(span.tags())
-        .contains(MapEntry.entry("grpc.statusCode", Status.OK.getCode().value()));
+        .containsEntry("some_tag", "some_value");
   }
 
   @Test
