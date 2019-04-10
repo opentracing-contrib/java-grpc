@@ -135,10 +135,9 @@ public class TracingInterceptorsTest {
     assertEquals("server span should be child of client span",
         References.CHILD_OF, serverSpan.references().get(0).getReferenceType());
 
-    assertTrue("client span should start before server span",
-        clientSpan.startMicros() <= serverSpan.startMicros());
-    assertTrue("client span should end after server span",
-        clientSpan.finishMicros() >= serverSpan.finishMicros());
+    assertTrue("client span should be longer than the server span",
+        (clientSpan.finishMicros() - clientSpan.startMicros())
+            >= (serverSpan.finishMicros() - serverSpan.startMicros()));
   }
 
   @Test
