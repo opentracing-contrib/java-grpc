@@ -22,20 +22,17 @@ import io.opentracing.contrib.grpc.gen.HelloReply;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
 import io.opentracing.util.GlobalTracer;
 
-public class TracedService {
+class TracedService {
 
-  void addGreeterService(MutableHandlerRegistry registry) {
+  static void addGeeterService(MutableHandlerRegistry registry) {
     registry.addService(new GreeterImpl());
   }
 
-  void addGreeterServiceWithInterceptors(
-      MutableHandlerRegistry registry,
-      ServerInterceptor... interceptors) {
-
+  static void addGeeterService(MutableHandlerRegistry registry, ServerInterceptor... interceptors) {
     registry.addService(ServerInterceptors.intercept(new GreeterImpl(), interceptors));
   }
 
-  private class GreeterImpl extends GreeterGrpc.GreeterImplBase {
+  private static class GreeterImpl extends GreeterGrpc.GreeterImplBase {
 
     @Override
     public void sayHello(HelloRequest req, StreamObserver<HelloReply> responseObserver) {
@@ -44,7 +41,7 @@ public class TracedService {
         throw new RuntimeException("no active span");
       }
 
-      HelloReply reply = HelloReply.newBuilder().setMessage("Hello").build();
+      HelloReply reply = HelloReply.newBuilder().setMessage("Hello " + req.getName()).build();
       responseObserver.onNext(reply);
       responseObserver.onCompleted();
     }

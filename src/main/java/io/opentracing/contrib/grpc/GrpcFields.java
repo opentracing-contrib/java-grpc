@@ -13,6 +13,10 @@
  */
 package io.opentracing.contrib.grpc;
 
+import com.google.common.collect.ImmutableMap;
+import io.opentracing.Span;
+import io.opentracing.log.Fields;
+
 final class GrpcFields {
 
     static final String ERROR = "error";
@@ -35,4 +39,30 @@ final class GrpcFields {
     static final String SERVER_CALL_LISTENER_ON_HALF_CLOSE = "server-call-listener-on-half-close";
     static final String SERVER_CALL_LISTENER_ON_CANCEL = "server-call-listener-on-cancel";
     static final String SERVER_CALL_LISTENER_ON_COMPLETE = "server-call-listener-on-complete";
+
+    static void logClientCallError(Span span, String message, Throwable cause) {
+        logCallError(span, message, cause, "Client");
+    }
+
+    static void logServerCallError(Span span, String message, Throwable cause) {
+        logCallError(span, message, cause, "Server");
+    }
+
+    private static void logCallError(Span span, String message, Throwable cause, String name) {
+        ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
+            .put(Fields.EVENT, GrpcFields.ERROR);
+        String causeMessage = null;
+        if (cause != null) {
+            builder.put(Fields.ERROR_OBJECT, cause);
+            causeMessage = cause.getMessage();
+        }
+        if (message != null) {
+            builder.put(Fields.MESSAGE, message);
+        } else if (causeMessage != null) {
+            builder.put(Fields.MESSAGE, causeMessage);
+        } else  {
+            builder.put(Fields.MESSAGE, name + " call failed");
+        }
+        span.log(builder.build());
+    }
 }

@@ -284,7 +284,7 @@ ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor
     .withClientCloseDecorator(new ClientCloseDecorator() {
         @Override
         public void close(Span span, Status status, Metadata trailers) {
-            span.setTag("grpc.statusCode", status.getCode().value());
+            span.setTag("some_other_tag", "some_other_value");
         }
     })
     ...
@@ -297,13 +297,13 @@ ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor
         @Override
         public void interceptCall(Span span, ServerCall call, Metadata headers) {
             span.setTag("some_tag", "some_value");
-            span.log("Example log");
+            span.log("Intercepting server call");
         }
     })
     .withServerCloseDecorator(new ServerCloseDecorator() {
         @Override
         public void close(Span span, Status status, Metadata trailers) {
-            span.setTag("grpc.statusCode", status.getCode().value());
+            span.setTag("some_other_tag", "some_other_value");
         }
     })
     ...

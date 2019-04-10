@@ -13,41 +13,45 @@
  */
 package io.opentracing.contrib.grpc;
 
-import io.grpc.Channel;
 import io.grpc.ClientInterceptor;
 import io.grpc.ClientInterceptors;
 import io.grpc.ManagedChannel;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
+import io.opentracing.contrib.grpc.gen.HelloReply;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
 import java.util.concurrent.TimeUnit;
 
-public class TracedClient {
+class TracedClient {
 
   private final GreeterGrpc.GreeterBlockingStub blockingStub;
 
-  public TracedClient(ManagedChannel channel) {
-    blockingStub = createStub(channel);
+  TracedClient(ManagedChannel channel, ClientInterceptor... interceptors) {
+    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors));
   }
 
-  public TracedClient(ManagedChannel channel, ClientInterceptor... interceptors) {
-    blockingStub = createStub(ClientInterceptors.intercept(channel, interceptors));
+  TracedClient(
+      ManagedChannel channel,
+      long deadline,
+      ClientInterceptor... interceptors) {
+    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
+        .withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
   }
 
-  private GreeterGrpc.GreeterBlockingStub createStub(Channel channel) {
-    return GreeterGrpc.newBlockingStub(channel)
-        .withDeadlineAfter(500, TimeUnit.MILLISECONDS)
-        .withCompression("gzip");
+  TracedClient(
+      ManagedChannel channel,
+      long deadline,
+      String compression,
+      ClientInterceptor... interceptors) {
+    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
+        .withDeadlineAfter(deadline, TimeUnit.MILLISECONDS)
+        .withCompression(compression);
   }
 
-  boolean greet(String name) {
-    HelloRequest request = HelloRequest.newBuilder()
-        .setName(name)
-        .build();
+  HelloReply greet(String name) {
     try {
-      blockingStub.sayHello(request);
-    } catch (Exception e) {
-      return false;
+      return blockingStub.sayHello(HelloRequest.newBuilder().setName(name).build());
+    } catch (Exception ignored) {
+      return null;
     }
-    return true;
   }
 }

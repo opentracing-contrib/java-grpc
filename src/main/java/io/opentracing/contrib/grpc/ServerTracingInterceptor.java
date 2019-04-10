@@ -13,6 +13,7 @@
  */
 package io.opentracing.contrib.grpc;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.grpc.BindableService;
 import io.grpc.Context;
@@ -189,22 +190,12 @@ public class ServerTracingInterceptor implements ServerInterceptor {
         @Override
         public void close(Status status, Metadata trailers) {
           if (verbose) {
-            if (status.getCode() == Status.Code.OK) {
-              span.log(ImmutableMap.<String, Object>builder()
-                  .put(Fields.EVENT, GrpcFields.SERVER_CALL_CLOSE)
-                  .put(Fields.MESSAGE, "Server call closed")
-                  .build());
-            } else {
-              ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
-                  .put(Fields.EVENT, GrpcFields.ERROR)
-                  .put(Fields.ERROR_KIND, status.getCode());
-              Throwable cause = status.getCause();
-              if (cause != null) {
-                builder.put(Fields.ERROR_OBJECT, cause);
-              }
-              String description = status.getDescription();
-              builder.put(Fields.MESSAGE, description != null ? description : "Server call failed");
-              span.log(builder.build());
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.SERVER_CALL_CLOSE)
+                .put(Fields.MESSAGE, "Server call closed")
+                .build());
+            if (!status.isOk()) {
+              GrpcFields.logServerCallError(span, status.getDescription(), status.getCause());
             }
           }
           GrpcTags.GRPC_STATUS.set(span, status);
@@ -256,6 +247,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .put(Fields.MESSAGE, "Server call cancelled")
                 .build());
           }
+          GrpcTags.GRPC_STATUS.set(span, Status.CANCELLED);
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onCancel();
           } finally {
@@ -271,6 +263,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .put(Fields.MESSAGE, "Server call completed")
                 .build());
           }
+          // Server span may complete with non-OK ServerCall.close(status).
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().onComplete();
           } finally {
@@ -288,7 +281,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
   }
 
-  private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
+  @VisibleForTesting
+  Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
     Map<String, Object> fields = null;
     Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName);
     try {

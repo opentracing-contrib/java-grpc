@@ -105,25 +105,6 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     return ClientInterceptors.intercept(channel, this);
   }
 
-  private SpanContext getActiveSpanContext() {
-    if (activeSpanSource != null) {
-      Span activeSpan = activeSpanSource.getActiveSpan();
-      if (activeSpan != null) {
-        return activeSpan.context();
-      }
-    }
-    if (activeSpanContextSource != null) {
-      final SpanContext spanContext = activeSpanContextSource.getActiveSpanContext();
-      if (spanContext != null) {
-        return spanContext;
-      }
-    }
-    if (tracer.activeSpan() != null) {
-      return tracer.activeSpan().context();
-    }
-    return null;
-  }
-
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method,
@@ -168,6 +149,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
       return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
           next.newCall(method, callOptions)) {
+
+        volatile boolean finished = false;
 
         @Override
         public void start(Listener<RespT> responseListener, final Metadata headers) {
@@ -223,23 +206,18 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
             @Override
             public void onClose(Status status, Metadata trailers) {
+              if (finished) {
+                delegate().onClose(status, trailers);
+                return;
+              }
+
               if (verbose) {
-                if (status.getCode() == Status.Code.OK) {
-                  span.log(ImmutableMap.<String, Object>builder()
-                      .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
-                      .put(Fields.MESSAGE, "Client call closed")
-                      .build());
-                } else {
-                  ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
-                      .put(Fields.EVENT, GrpcFields.ERROR)
-                      .put(Fields.ERROR_KIND, status.getCode());
-                  Throwable cause = status.getCause();
-                  if (cause != null) {
-                    builder.put(Fields.ERROR_OBJECT, cause);
-                  }
-                  String description = status.getDescription();
-                  builder.put(Fields.MESSAGE, description != null ? description : "Client call failed");
-                  span.log(builder.build());
+                span.log(ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
+                    .put(Fields.MESSAGE, "Client call closed")
+                    .build());
+                if (!status.isOk()) {
+                  GrpcFields.logClientCallError(span, status.getDescription(), status.getCause());
                 }
               }
               GrpcTags.GRPC_STATUS.set(span, status);
@@ -247,6 +225,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 clientCloseDecorator.close(span, status, trailers);
               }
               delegate().onClose(status, trailers);
+              finished = true;
               span.finish();
             }
           };
@@ -263,23 +242,16 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           }
         }
 
-
         @Override
-        public void cancel(@Nullable String message, @Nullable Throwable cause) {
-          if (verbose) {
-            ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-            if (cause != null) {
-              builder
-                  .put(Fields.EVENT, GrpcFields.ERROR)
-                  .put(Fields.ERROR_OBJECT, cause);
-            } else {
-              builder.put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL);
-            }
-            builder.put(Fields.MESSAGE, message != null ? message : "Client call canceled");
-            span.log(builder.build());
+        public void sendMessage(ReqT message) {
+          if (streaming || verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
+                .put(Fields.MESSAGE, "Client sent message")
+                .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().cancel(message, cause);
+            delegate().sendMessage(message);
           }
         }
 
@@ -297,15 +269,26 @@ public class ClientTracingInterceptor implements ClientInterceptor {
         }
 
         @Override
-        public void sendMessage(ReqT message) {
-          if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
-                .put(Fields.MESSAGE, "Client sent message")
-                .build());
+        public void cancel(@Nullable String message, @Nullable Throwable cause) {
+          if (finished) {
+            delegate().cancel(message, cause);
+            return;
           }
+
+          if (verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL)
+                .put(Fields.MESSAGE, "Client call canceled")
+                .build());
+            GrpcFields.logClientCallError(span, message, cause);
+          }
+          Status status = cause == null ? Status.UNKNOWN : Status.fromThrowable(cause);
+          GrpcTags.GRPC_STATUS.set(span, status.withDescription(message));
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().sendMessage(message);
+            delegate().cancel(message, cause);
+          } finally {
+            finished = true;
+            span.finish();
           }
         }
 
@@ -331,6 +314,25 @@ public class ClientTracingInterceptor implements ClientInterceptor {
         }
       };
     }
+  }
+
+  private SpanContext getActiveSpanContext() {
+    if (activeSpanSource != null) {
+      Span activeSpan = activeSpanSource.getActiveSpan();
+      if (activeSpan != null) {
+        return activeSpan.context();
+      }
+    }
+    if (activeSpanContextSource != null) {
+      final SpanContext spanContext = activeSpanContextSource.getActiveSpanContext();
+      if (spanContext != null) {
+        return spanContext;
+      }
+    }
+    if (tracer.activeSpan() != null) {
+      return tracer.activeSpan().context();
+    }
+    return null;
   }
 
   private Span createSpanFromParent(SpanContext parentSpanContext, String operationName) {
