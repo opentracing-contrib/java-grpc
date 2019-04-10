@@ -225,8 +225,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 clientCloseDecorator.close(span, status, trailers);
               }
               delegate().onClose(status, trailers);
-              span.finish();
               finished = true;
+              span.finish();
             }
           };
 
@@ -287,8 +287,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().cancel(message, cause);
           } finally {
-            span.finish();
             finished = true;
+            span.finish();
           }
         }
 
