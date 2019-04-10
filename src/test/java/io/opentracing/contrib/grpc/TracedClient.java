@@ -17,6 +17,7 @@ import io.grpc.ClientInterceptor;
 import io.grpc.ClientInterceptors;
 import io.grpc.ManagedChannel;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
+import io.opentracing.contrib.grpc.gen.HelloReply;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
 import java.util.concurrent.TimeUnit;
 
@@ -38,15 +39,11 @@ class TracedClient {
         .withCompression(compression);
   }
 
-  boolean greet(String name) {
-    HelloRequest request = HelloRequest.newBuilder()
-        .setName(name)
-        .build();
+  HelloReply greet(String name) {
     try {
-      blockingStub.sayHello(request);
-    } catch (Exception e) {
-      return false;
+      return blockingStub.sayHello(HelloRequest.newBuilder().setName(name).build());
+    } catch (Exception ignored) {
+      return null;
     }
-    return true;
   }
 }

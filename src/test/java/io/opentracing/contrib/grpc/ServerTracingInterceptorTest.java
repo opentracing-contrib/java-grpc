@@ -63,33 +63,28 @@ public class ServerTracingInterceptorTest {
       GrpcTags.GRPC_HEADERS.getKey(),
       GrpcTags.PEER_ADDRESS.getKey());
 
-  private final MockTracer clientTracer = new MockTracer();
   private final MockTracer serverTracer = new MockTracer();
 
   @Rule
   public GrpcServerRule grpcServer = new GrpcServerRule();
 
   private TracedClient client;
-  private TracedService service;
 
   @Before
   public void before() {
     GlobalTracerTestUtil.resetGlobalTracer();
-    clientTracer.reset();
     serverTracer.reset();
     client = new TracedClient(grpcServer.getChannel());
-    service = new TracedService();
   }
 
   @Test
   public void testTracedServerBasic() {
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -108,13 +103,11 @@ public class ServerTracingInterceptorTest {
   public void testTracedServerTwoInterceptors() {
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(
-        grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -135,12 +128,11 @@ public class ServerTracingInterceptorTest {
         .Builder(serverTracer)
         .withVerbosity()
         .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -173,12 +165,11 @@ public class ServerTracingInterceptorTest {
         .Builder(serverTracer)
         .withStreaming()
         .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -215,12 +206,11 @@ public class ServerTracingInterceptorTest {
           }
         })
         .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -241,12 +231,11 @@ public class ServerTracingInterceptorTest {
         .Builder(serverTracer)
         .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.values())
         .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -275,17 +264,15 @@ public class ServerTracingInterceptorTest {
         span.log("A test log");
       }
     };
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withServerSpanDecorator(serverSpanDecorator)
         .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 
@@ -311,17 +298,15 @@ public class ServerTracingInterceptorTest {
         span.setTag("grpc.statusCode", status.getCode().value());
       }
     };
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withServerCloseDecorator(serverCloseDecorator)
         .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
 

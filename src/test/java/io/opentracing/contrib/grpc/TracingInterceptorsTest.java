@@ -37,34 +37,27 @@ public class TracingInterceptorsTest {
   @Rule
   public GrpcServerRule grpcServer = new GrpcServerRule();
 
-  private TracedService service;
-
   @Before
   public void before() {
     GlobalTracerTestUtil.resetGlobalTracer();
     clientTracer.reset();
     serverTracer.reset();
-    service = new TracedService();
+    // register server tracer to verify active span on server side
+    GlobalTracer.registerIfAbsent(serverTracer);
   }
 
   @Test
   public void testTracedClientAndServer() {
-    // register server tracer to verify active span on server side
-    GlobalTracer.register(serverTracer);
+    ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
-    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
+    ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor(serverTracer);
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
-    ServerTracingInterceptor serverTracingInterceptor = new ServerTracingInterceptor(serverTracer);
-
-    service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), serverTracingInterceptor);
-
-    assertTrue("call should complete", client.greet("world"));
-    assertEquals("a client span should have been created for the request",
-        1, clientTracer.finishedSpans().size());
-
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
-    await().atMost(15, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("a server span should have been created for the request",
         1, serverTracer.finishedSpans().size());
     assertEquals("a client span should have been created for the request",
