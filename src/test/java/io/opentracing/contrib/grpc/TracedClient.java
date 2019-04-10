@@ -32,6 +32,14 @@ class TracedClient {
   TracedClient(
       ManagedChannel channel,
       long deadline,
+      ClientInterceptor... interceptors) {
+    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
+        .withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
+  }
+
+  TracedClient(
+      ManagedChannel channel,
+      long deadline,
       String compression,
       ClientInterceptor... interceptors) {
     blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))

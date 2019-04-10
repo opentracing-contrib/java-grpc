@@ -243,6 +243,32 @@ public class ClientTracingInterceptor implements ClientInterceptor {
         }
 
         @Override
+        public void sendMessage(ReqT message) {
+          if (streaming || verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
+                .put(Fields.MESSAGE, "Client sent message")
+                .build());
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().sendMessage(message);
+          }
+        }
+
+        @Override
+        public void halfClose() {
+          if (streaming || verbose) {
+            span.log(ImmutableMap.<String, Object>builder()
+                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_HALF_CLOSE)
+                .put(Fields.MESSAGE, "Client sent all messages")
+                .build());
+          }
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            delegate().halfClose();
+          }
+        }
+
+        @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
           if (finished) {
             delegate().cancel(message, cause);
@@ -263,32 +289,6 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           } finally {
             span.finish();
             finished = true;
-          }
-        }
-
-        @Override
-        public void halfClose() {
-          if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_HALF_CLOSE)
-                .put(Fields.MESSAGE, "Client sent all messages")
-                .build());
-          }
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().halfClose();
-          }
-        }
-
-        @Override
-        public void sendMessage(ReqT message) {
-          if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
-                .put(Fields.MESSAGE, "Client sent message")
-                .build());
-          }
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().sendMessage(message);
           }
         }
 
