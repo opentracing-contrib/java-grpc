@@ -105,25 +105,6 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     return ClientInterceptors.intercept(channel, this);
   }
 
-  private SpanContext getActiveSpanContext() {
-    if (activeSpanSource != null) {
-      Span activeSpan = activeSpanSource.getActiveSpan();
-      if (activeSpan != null) {
-        return activeSpan.context();
-      }
-    }
-    if (activeSpanContextSource != null) {
-      final SpanContext spanContext = activeSpanContextSource.getActiveSpanContext();
-      if (spanContext != null) {
-        return spanContext;
-      }
-    }
-    if (tracer.activeSpan() != null) {
-      return tracer.activeSpan().context();
-    }
-    return null;
-  }
-
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
       MethodDescriptor<ReqT, RespT> method,
@@ -331,6 +312,25 @@ public class ClientTracingInterceptor implements ClientInterceptor {
         }
       };
     }
+  }
+
+  private SpanContext getActiveSpanContext() {
+    if (activeSpanSource != null) {
+      Span activeSpan = activeSpanSource.getActiveSpan();
+      if (activeSpan != null) {
+        return activeSpan.context();
+      }
+    }
+    if (activeSpanContextSource != null) {
+      final SpanContext spanContext = activeSpanContextSource.getActiveSpanContext();
+      if (spanContext != null) {
+        return spanContext;
+      }
+    }
+    if (tracer.activeSpan() != null) {
+      return tracer.activeSpan().context();
+    }
+    return null;
   }
 
   private Span createSpanFromParent(SpanContext parentSpanContext, String operationName) {

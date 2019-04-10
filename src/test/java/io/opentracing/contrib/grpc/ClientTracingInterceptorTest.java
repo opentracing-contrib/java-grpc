@@ -26,6 +26,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.testing.GrpcServerRule;
 import io.opentracing.Span;
+import io.opentracing.SpanContext;
 import io.opentracing.log.Fields;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
@@ -245,6 +246,68 @@ public class ClientTracingInterceptorTest {
     Assertions.assertThat(span.tags().keySet())
         .as("span should have tags for all client request attributes")
         .containsAll(CLIENT_ATTRIBUTE_TAGS);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void testTracedClientwithActiveSpanSource() {
+    final MockSpan parentSpan = clientTracer.buildSpan("parent").start();
+    ActiveSpanSource activeSpanSource = new ActiveSpanSource() {
+      @Override
+      public Span getActiveSpan() {
+        return parentSpan;
+      }
+    };
+    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+        .Builder(clientTracer)
+        .withActiveSpanSource(activeSpanSource)
+        .build();
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
+
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have parent", span.parentId(), parentSpan.context().spanId());
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
+    assertFalse("span should have no baggage",
+        span.context().baggageItems().iterator().hasNext());
+  }
+
+  @Test
+  public void testTracedClientwithActiveSpanContextSource() {
+    final MockSpan parentSpan = clientTracer.buildSpan("parent").start();
+    ActiveSpanContextSource activeSpanContextSource = new ActiveSpanContextSource() {
+      @Override
+      public SpanContext getActiveSpanContext() {
+        return parentSpan.context();
+      }
+    };
+    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+        .Builder(clientTracer)
+        .withActiveSpanContextSource(activeSpanContextSource)
+        .build();
+    TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
+
+    assertEquals("call should complete successfully", "Hello world",
+        client.greet("world").getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
+    assertEquals("one span should have been created and finished for one client request",
+        clientTracer.finishedSpans().size(), 1);
+
+    MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have parent", span.parentId(), parentSpan.context().spanId());
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    Assertions.assertThat(span.tags()).as("span should have base client tags")
+        .isEqualTo(BASE_CLIENT_TAGS);
     assertFalse("span should have no baggage",
         span.context().baggageItems().iterator().hasNext());
   }
