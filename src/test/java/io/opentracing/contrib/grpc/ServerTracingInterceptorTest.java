@@ -69,6 +69,7 @@ public class ServerTracingInterceptorTest {
   @Rule
   public GrpcServerRule grpcServer = new GrpcServerRule();
 
+  private TracedClient client;
   private TracedService service;
 
   @Before
@@ -76,13 +77,12 @@ public class ServerTracingInterceptorTest {
     GlobalTracerTestUtil.resetGlobalTracer();
     clientTracer.reset();
     serverTracer.reset();
+    client = new TracedClient(grpcServer.getChannel());
     service = new TracedService();
   }
 
   @Test
   public void testTracedServerBasic() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
 
     service.addGreeterServiceWithInterceptors(grpcServer.getServiceRegistry(), tracingInterceptor);
@@ -106,8 +106,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerTwoInterceptors() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
 
@@ -133,8 +131,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithVerbosity() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withVerbosity()
@@ -173,8 +169,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithStreaming() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withStreaming()
@@ -211,7 +205,6 @@ public class ServerTracingInterceptorTest {
   @Test
   public void testTracedServerWithCustomOperationName() {
     final String PREFIX = "testing-";
-    TracedClient client = new TracedClient(grpcServer.getChannel());
 
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
@@ -244,8 +237,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithTracedAttributes() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.values())
@@ -274,7 +265,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithServerSpanDecorator() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
     ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
       @Override
       public void interceptCall(Span span, ServerCall call, Metadata headers) {
@@ -315,7 +305,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithServerCloseDecorator() {
-    TracedClient client = new TracedClient(grpcServer.getChannel());
     ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
