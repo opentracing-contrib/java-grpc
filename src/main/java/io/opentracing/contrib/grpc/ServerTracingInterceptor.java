@@ -13,6 +13,7 @@
  */
 package io.opentracing.contrib.grpc;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.grpc.BindableService;
 import io.grpc.Context;
@@ -288,7 +289,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
   }
 
-  private Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
+  @VisibleForTesting
+  Span getSpanFromHeaders(Map<String, String> headers, String operationName) {
     Map<String, Object> fields = null;
     Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName);
     try {

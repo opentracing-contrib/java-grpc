@@ -14,10 +14,18 @@
 package io.opentracing.contrib.grpc;
 
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -30,6 +38,8 @@ import io.opentracing.Span;
 import io.opentracing.log.Fields;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
+import io.opentracing.propagation.Format;
+import io.opentracing.propagation.TextMapAdapter;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracerTestUtil;
 import org.assertj.core.api.Assertions;
@@ -38,6 +48,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -313,6 +324,43 @@ public class ServerTracingInterceptorTest {
     MockSpan span = serverTracer.finishedSpans().get(0);
     Assertions.assertThat(span.tags())
         .contains(MapEntry.entry("grpc.statusCode", Status.OK.getCode().value()));
+  }
+
+  @Test
+  public void testGetSpanFromHeaders() {
+    long traceID = 1;
+    long spanID = 2;
+    MockTracer spyTracer = spy(serverTracer);
+    doReturn(new MockSpan.MockContext(traceID, spanID, Collections.<String, String>emptyMap()))
+        .when(spyTracer)
+        .extract(eq(Format.Builtin.HTTP_HEADERS), any(TextMapAdapter.class));
+
+    Span span = new ServerTracingInterceptor(spyTracer).getSpanFromHeaders(
+        Collections.<String, String>emptyMap(), "operationName");
+    assertNotNull("span is not null", span);
+    MockSpan mockSpan = (MockSpan) span;
+    assertEquals("span parentID is set to extracted span context spanID",
+        spanID, mockSpan.parentId());
+    List<MockSpan.LogEntry> logEntries = mockSpan.logEntries();
+    assertTrue("span contains no log entries", logEntries.isEmpty());
+  }
+
+  @Test
+  public void testGetSpanFromHeadersError() {
+    MockTracer spyTracer = spy(serverTracer);
+    doThrow(IllegalArgumentException.class)
+        .when(spyTracer)
+        .extract(eq(Format.Builtin.HTTP_HEADERS), any(TextMapAdapter.class));
+
+    Span span = new ServerTracingInterceptor(spyTracer).getSpanFromHeaders(
+        Collections.<String, String>emptyMap(), "operationName");
+    assertNotNull("span is not null", span);
+    List<MockSpan.LogEntry> logEntries = ((MockSpan) span).logEntries();
+    assertEquals("span contains 1 log entry", 1, logEntries.size());
+    assertEquals("span log contains error field", GrpcFields.ERROR,
+        logEntries.get(0).fields().get(Fields.EVENT));
+    assertThat("span log contains error.object field",
+        logEntries.get(0).fields().get(Fields.ERROR_OBJECT), instanceOf(RuntimeException.class));
   }
 
   private Callable<Integer> reportedSpansSize(final MockTracer mockTracer) {
