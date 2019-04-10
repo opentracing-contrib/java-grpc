@@ -303,7 +303,7 @@ ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor
     .withServerCloseDecorator(new ServerCloseDecorator() {
         @Override
         public void close(Span span, Status status, Metadata trailers) {
-            span.setTag("same_other_tag", "some_other_value");
+            span.setTag("some_other_tag", "some_other_value");
         }
     })
     ...
