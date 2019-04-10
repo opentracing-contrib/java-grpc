@@ -150,6 +150,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
           next.newCall(method, callOptions)) {
 
+        volatile boolean finished = false;
+
         @Override
         public void start(Listener<RespT> responseListener, final Metadata headers) {
           if (verbose) {
@@ -204,6 +206,11 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
             @Override
             public void onClose(Status status, Metadata trailers) {
+              if (finished) {
+                delegate().onClose(status, trailers);
+                return;
+              }
+
               if (verbose) {
                 span.log(ImmutableMap.<String, Object>builder()
                     .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
@@ -219,6 +226,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
               }
               delegate().onClose(status, trailers);
               span.finish();
+              finished = true;
             }
           };
 
@@ -236,6 +244,11 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
+          if (finished) {
+            delegate().cancel(message, cause);
+            return;
+          }
+
           if (verbose) {
             span.log(ImmutableMap.<String, Object>builder()
                 .put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL)
@@ -247,6 +260,9 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           GrpcTags.GRPC_STATUS.set(span, status.withDescription(message));
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().cancel(message, cause);
+          } finally {
+            span.finish();
+            finished = true;
           }
         }
 
