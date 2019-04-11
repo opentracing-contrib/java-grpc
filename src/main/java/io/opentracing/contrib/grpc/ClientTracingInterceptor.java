@@ -39,6 +39,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
 /**
@@ -150,7 +151,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
           next.newCall(method, callOptions)) {
 
-        volatile boolean finished = false;
+        private AtomicBoolean finished = new AtomicBoolean(false);
 
         @Override
         public void start(Listener<RespT> responseListener, final Metadata headers) {
@@ -206,7 +207,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
             @Override
             public void onClose(Status status, Metadata trailers) {
-              if (finished) {
+              if (!finished.compareAndSet(false, true)) {
                 delegate().onClose(status, trailers);
                 return;
               }
@@ -225,7 +226,6 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 clientCloseDecorator.close(span, status, trailers);
               }
               delegate().onClose(status, trailers);
-              finished = true;
               span.finish();
             }
           };
@@ -270,7 +270,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
-          if (finished) {
+          if (!finished.compareAndSet(false, true)) {
             delegate().cancel(message, cause);
             return;
           }
@@ -287,7 +287,6 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             delegate().cancel(message, cause);
           } finally {
-            finished = true;
             span.finish();
           }
         }
