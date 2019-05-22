@@ -348,13 +348,14 @@ public class TracingInterceptorsTest {
     for (MockSpan.LogEntry logEntry : serverSpan.logEntries()) {
       serverEvents.add((String) logEntry.fields().get(Fields.EVENT));
     }
+    // The RuntimeException schedules a task to execute the closed/onComplete call path.
+    // There is a race between when the closed/onComplete call path is executed and when
+    // the halfClose/close call path is executed.  Commenting out the lines below since
+    // there is no guarantee that halfClose/close will run and write the error status.
     Assertions.assertThat(serverEvents)
         .as("server span should contain verbose log fields")
         .contains(
             GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE,
-            // The RuntimeException schedules a task to execute the closed/onComplete call path.
-            // There is a race between when the closed/onComplete call path is executed and when
-            // the halfClose/close call path is executed.
             //GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE,
             //GrpcFields.SERVER_CALL_CLOSE,
             //GrpcFields.ERROR,
@@ -362,8 +363,8 @@ public class TracingInterceptorsTest {
     Assertions.assertThat(serverSpan.tags())
         .as("server span grpc.status tag should equal INTERNAL")
         .containsEntry(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
-        .containsEntry(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
-        .containsEntry(GrpcTags.GRPC_STATUS.getKey(), Status.Code.INTERNAL.name());
+        .containsEntry(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME);
+        //.containsEntry(GrpcTags.GRPC_STATUS.getKey(), Status.Code.INTERNAL.name());
   }
 
   @Test
