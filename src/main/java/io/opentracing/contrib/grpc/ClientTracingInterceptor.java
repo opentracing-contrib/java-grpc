@@ -13,6 +13,7 @@
  */
 package io.opentracing.contrib.grpc;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 import io.grpc.Attributes;
 import io.grpc.CallOptions;
@@ -129,7 +130,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             GrpcTags.GRPC_CALL_OPTIONS.set(span, callOptions);
             break;
           case AUTHORITY:
-            GrpcTags.GRPC_AUTHORITY.set(span, callOptions.getAuthority());
+            GrpcTags.GRPC_AUTHORITY.set(span,
+                MoreObjects.firstNonNull(callOptions.getAuthority(), next.authority()));
             break;
           case COMPRESSOR:
             GrpcTags.GRPC_COMPRESSOR.set(span, callOptions.getCompressor());
