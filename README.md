@@ -252,7 +252,7 @@ import io.opentracing.Span;
         ...
         .withActiveSpanContextSource(new ActiveSpanContextSource() {
             @Override
-            public Span getActiveSpanContext() {
+            public SpanContext getActiveSpanContext() {
                 return Context.get(OPENTRACING_SPAN_CONTEXT_KEY);
             }
         })
