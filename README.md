@@ -269,6 +269,7 @@ We also provide two built-in implementations:
 
 If you want to add custom tags or logs to the server and client spans, then you can implement the 
 `ClientSpanDecorator`, `ClientCloseDecorator`, `ServerSpanDecorator`, and `ServerCloseDecorator` interfaces.
+Multiple different decorators may be added to the builder.
 
 ```java
 ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor

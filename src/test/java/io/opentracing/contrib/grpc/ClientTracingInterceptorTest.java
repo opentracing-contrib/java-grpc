@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.awaitility.Awaitility.await;
@@ -32,18 +33,20 @@ import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracerTestUtil;
-import org.assertj.core.api.Assertions;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import org.assertj.core.api.Assertions;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
 public class ClientTracingInterceptorTest {
+
+  private static final String PREFIX = "testing-";
 
   private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>builder()
       .put(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
@@ -102,7 +105,8 @@ public class ClientTracingInterceptorTest {
   public void testTracedClientTwoInterceptors() {
     SecondClientInterceptor secondInterceptor = new SecondClientInterceptor(clientTracer);
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
-    TracedClient client = new TracedClient(grpcServer.getChannel(), secondInterceptor, tracingInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), secondInterceptor,
+        tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
         client.greet("world").getMessage());
@@ -192,8 +196,6 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithOperationName() {
-    final String PREFIX = "testing-";
-
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
         .withOperationName(new OperationNameConstructor() {
@@ -313,19 +315,25 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithClientSpanDecorator() {
-    ClientSpanDecorator clientSpanDecorator = new ClientSpanDecorator() {
+    ClientSpanDecorator spanTagger = new ClientSpanDecorator() {
       @Override
       public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
         span.setTag("test_tag", "test_value");
         span.setTag("tag_from_method", method.getFullMethodName());
         span.setTag("tag_from_call_options", callOptions.getCompressor());
-        span.log("A test log");
+      }
+    };
+    ClientSpanDecorator spanLogger = new ClientSpanDecorator() {
+      @Override
+      public void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions) {
+        span.log("A span log");
       }
     };
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
-        .withClientSpanDecorator(clientSpanDecorator)
+        .withClientSpanDecorator(spanTagger)
+        .withClientSpanDecorator(spanLogger)
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
@@ -339,7 +347,7 @@ public class ClientTracingInterceptorTest {
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
     assertEquals("span should have one log from the decorator",
-        span.logEntries().size(), 1);
+        span.logEntries().get(0).fields().get("event"), "A span log");
     Assertions.assertThat(span.tags()).as("span should have 3 tags from the decorator")
         .hasSize(3 + BASE_CLIENT_TAGS.size());
     Assertions.assertThat(span.tags()).as("span contains added tags")
@@ -351,16 +359,23 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithClientCloseDecorator() {
-    ClientCloseDecorator clientCloseDecorator = new ClientCloseDecorator() {
+    ClientCloseDecorator closeTagger = new ClientCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
         span.setTag("some_tag", "some_value");
       }
     };
+    ClientCloseDecorator closeLogger = new ClientCloseDecorator() {
+      @Override
+      public void close(Span span, Status status, Metadata trailers) {
+        span.log("A close log");
+      }
+    };
 
     ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
         .Builder(clientTracer)
-        .withClientCloseDecorator(clientCloseDecorator)
+        .withClientCloseDecorator(closeTagger)
+        .withClientCloseDecorator(closeLogger)
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
@@ -369,8 +384,9 @@ public class ClientTracingInterceptorTest {
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
-
     MockSpan span = clientTracer.finishedSpans().get(0);
+    assertEquals("span should have one log from the decorator",
+        span.logEntries().get(0).fields().get("event"), "A close log");
     Assertions.assertThat(span.tags())
         .containsEntry("some_tag", "some_value");
   }

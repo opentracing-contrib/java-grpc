@@ -42,10 +42,6 @@ import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapAdapter;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracerTestUtil;
-import org.assertj.core.api.Assertions;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,8 +49,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import org.assertj.core.api.Assertions;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
 public class ServerTracingInterceptorTest {
+
+  private static final String PREFIX = "testing-";
 
   private static final Map<String, Object> BASE_TAGS = ImmutableMap.<String, Object>builder()
       .put(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
@@ -113,7 +115,8 @@ public class ServerTracingInterceptorTest {
   public void testTracedServerTwoInterceptors() {
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(serverTracer);
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
-    TracedService.addGeeterService(grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
+    TracedService.addGeeterService(
+        grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
         client.greet("world").getMessage());
@@ -205,8 +208,6 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithCustomOperationName() {
-    final String PREFIX = "testing-";
-
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
         .withOperationName(new OperationNameConstructor() {
@@ -264,19 +265,25 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithServerSpanDecorator() {
-    ServerSpanDecorator serverSpanDecorator = new ServerSpanDecorator() {
+    ServerSpanDecorator spanTagger = new ServerSpanDecorator() {
       @Override
       public void interceptCall(Span span, ServerCall call, Metadata headers) {
         span.setTag("test_tag", "test_value");
         span.setTag("tag_from_call", call.getAuthority());
         span.setTag("tag_from_headers", headers.toString());
-
-        span.log("A test log");
       }
     };
+    ServerSpanDecorator spanLogger = new ServerSpanDecorator() {
+      @Override
+      public void interceptCall(Span span, ServerCall call, Metadata headers) {
+        span.log("A span log");
+      }
+    };
+
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
-        .withServerSpanDecorator(serverSpanDecorator)
+        .withServerSpanDecorator(spanTagger)
+        .withServerSpanDecorator(spanLogger)
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
@@ -289,8 +296,8 @@ public class ServerTracingInterceptorTest {
     MockSpan span = serverTracer.finishedSpans().get(0);
     assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
     assertEquals("span should have no parents", span.parentId(), 0);
-    Assertions.assertThat(span.logEntries()).as("span should have one log added in the decorator")
-        .hasSize(1);
+    assertEquals("span should have one log added in the decorator",
+        span.logEntries().get(0).fields().get("event"), "A span log");
     Assertions.assertThat(span.tags()).as("span should have 3 tags added in the decorator")
         .hasSize(3 + BASE_SERVER_TAGS.size());
     Assertions.assertThat(span.tags()).as("span contains added tags")
@@ -302,15 +309,22 @@ public class ServerTracingInterceptorTest {
 
   @Test
   public void testTracedServerWithServerCloseDecorator() {
-    ServerCloseDecorator serverCloseDecorator = new ServerCloseDecorator() {
+    ServerCloseDecorator closeTagger = new ServerCloseDecorator() {
       @Override
       public void close(Span span, Status status, Metadata trailers) {
         span.setTag("some_tag", "some_value");
       }
     };
+    ServerCloseDecorator closeLogger = new ServerCloseDecorator() {
+      @Override
+      public void close(Span span, Status status, Metadata trailers) {
+        span.log("A close log");
+      }
+    };
     ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
         .Builder(serverTracer)
-        .withServerCloseDecorator(serverCloseDecorator)
+        .withServerCloseDecorator(closeTagger)
+        .withServerCloseDecorator(closeLogger)
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
@@ -321,6 +335,8 @@ public class ServerTracingInterceptorTest {
         serverTracer.finishedSpans().size(), 1);
 
     MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have one log from the decorator",
+        span.logEntries().get(0).fields().get("event"), "A close log");
     Assertions.assertThat(span.tags())
         .containsEntry("some_tag", "some_value");
   }

@@ -11,11 +11,12 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.grpc.Attributes;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
@@ -36,8 +37,10 @@ import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -55,18 +58,20 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   private final Set<ClientRequestAttribute> tracedAttributes;
   private final ActiveSpanSource activeSpanSource;
   private final ActiveSpanContextSource activeSpanContextSource;
-  private final ClientSpanDecorator clientSpanDecorator;
-  private final ClientCloseDecorator clientCloseDecorator;
+  private final ImmutableList<ClientSpanDecorator> clientSpanDecorators;
+  private final ImmutableList<ClientCloseDecorator> clientCloseDecorators;
 
   /**
-   * Instantiate interceptor using GlobalTracer to get tracer
+   * Instantiate interceptor using GlobalTracer to get tracer.
    */
   public ClientTracingInterceptor() {
     this(GlobalTracer.get());
   }
 
   /**
-   * @param tracer to use to trace requests
+   * Instantiate interceptor with provided tracer.
+   *
+   * @param tracer to use to trace requests.
    */
   public ClientTracingInterceptor(Tracer tracer) {
     this.tracer = tracer;
@@ -76,25 +81,21 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     this.tracedAttributes = new HashSet<>();
     this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
     this.activeSpanContextSource = null;
-    this.clientSpanDecorator = null;
-    this.clientCloseDecorator = null;
+    this.clientSpanDecorators = ImmutableList.of();
+    this.clientCloseDecorators = ImmutableList.of();
   }
 
-  private ClientTracingInterceptor(Tracer tracer, OperationNameConstructor operationNameConstructor,
-      boolean streaming,
-      boolean verbose, Set<ClientRequestAttribute> tracedAttributes,
-      ActiveSpanSource activeSpanSource, ActiveSpanContextSource activeSpanContextSource,
-      ClientSpanDecorator clientSpanDecorator,
-      ClientCloseDecorator clientCloseDecorator) {
-    this.tracer = tracer;
-    this.operationNameConstructor = operationNameConstructor;
-    this.streaming = streaming;
-    this.verbose = verbose;
-    this.tracedAttributes = tracedAttributes;
-    this.activeSpanSource = activeSpanSource;
-    this.activeSpanContextSource = activeSpanContextSource;
-    this.clientSpanDecorator = clientSpanDecorator;
-    this.clientCloseDecorator = clientCloseDecorator;
+  private ClientTracingInterceptor(Builder builder) {
+    this.tracer = builder.tracer;
+    this.operationNameConstructor = builder.operationNameConstructor;
+    this.streaming = builder.streaming;
+    this.verbose = builder.verbose;
+    this.tracedAttributes = builder.tracedAttributes;
+    this.activeSpanSource = builder.activeSpanSource;
+    this.activeSpanContextSource = builder.activeSpanContextSource;
+    this.clientSpanDecorators = ImmutableList.copyOf(builder.clientSpanDecorators.values());
+    this.clientCloseDecorators = ImmutableList.copyOf(builder.clientCloseDecorators.values());
+
   }
 
   /**
@@ -120,7 +121,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
 
     try (Scope ignored = tracer.scopeManager().activate(span)) {
 
-      if (clientSpanDecorator != null) {
+      for (ClientSpanDecorator clientSpanDecorator : clientSpanDecorators) {
         clientSpanDecorator.interceptCall(span, method, callOptions);
       }
 
@@ -147,6 +148,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
             break;
           case HEADERS:
             break;
+          default:
+            // noop
         }
       }
 
@@ -170,7 +173,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new TextMap() {
             @Override
             public void put(String key, String value) {
-              Metadata.Key<String> headerKey = Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER);
+              Metadata.Key<String> headerKey =
+                  Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER);
               headers.put(headerKey, value);
             }
 
@@ -193,7 +197,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                     .put(GrpcFields.HEADERS, headers.toString())
                     .build());
               }
-              delegate().onHeaders(headers);
+              super.onHeaders(headers);
             }
 
             @Override
@@ -204,13 +208,13 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                     .put(Fields.MESSAGE, "Client received response message")
                     .build());
               }
-              delegate().onMessage(message);
+              super.onMessage(message);
             }
 
             @Override
             public void onClose(Status status, Metadata trailers) {
               if (!finished.compareAndSet(false, true)) {
-                delegate().onClose(status, trailers);
+                super.onClose(status, trailers);
                 return;
               }
 
@@ -224,23 +228,23 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 }
               }
               GrpcTags.GRPC_STATUS.set(span, status);
-              if (clientCloseDecorator != null) {
+              for (ClientCloseDecorator clientCloseDecorator : clientCloseDecorators) {
                 clientCloseDecorator.close(span, status, trailers);
               }
-              delegate().onClose(status, trailers);
+              super.onClose(status, trailers);
               span.finish();
             }
           };
 
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().start(tracingResponseListener, headers);
+            super.start(tracingResponseListener, headers);
           }
         }
 
         @Override
         public void request(int numMessages) {
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().request(numMessages);
+            super.request(numMessages);
           }
         }
 
@@ -253,7 +257,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().sendMessage(message);
+            super.sendMessage(message);
           }
         }
 
@@ -266,14 +270,14 @@ public class ClientTracingInterceptor implements ClientInterceptor {
                 .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().halfClose();
+            super.halfClose();
           }
         }
 
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
           if (!finished.compareAndSet(false, true)) {
-            delegate().cancel(message, cause);
+            super.cancel(message, cause);
             return;
           }
 
@@ -287,30 +291,9 @@ public class ClientTracingInterceptor implements ClientInterceptor {
           Status status = cause == null ? Status.UNKNOWN : Status.fromThrowable(cause);
           GrpcTags.GRPC_STATUS.set(span, status.withDescription(message));
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().cancel(message, cause);
+            super.cancel(message, cause);
           } finally {
             span.finish();
-          }
-        }
-
-        @Override
-        public boolean isReady() {
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            return delegate().isReady();
-          }
-        }
-
-        @Override
-        public void setMessageCompression(boolean enabled) {
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().setMessageCompression(enabled);
-          }
-        }
-
-        @Override
-        public Attributes getAttributes() {
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            return delegate().getAttributes();
           }
         }
       };
@@ -361,17 +344,19 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     private Set<ClientRequestAttribute> tracedAttributes;
     private ActiveSpanSource activeSpanSource;
     private ActiveSpanContextSource activeSpanContextSource;
-    private ClientSpanDecorator clientSpanDecorator;
-    private ClientCloseDecorator clientCloseDecorator;
+    private Map<Class<?>, ClientSpanDecorator> clientSpanDecorators;
+    private Map<Class<?>, ClientCloseDecorator> clientCloseDecorators;
 
     /**
-     * Creates a Builder using GlobalTracer to get tracer
+     * Creates a Builder using GlobalTracer to get tracer.
      */
     public Builder() {
       this(GlobalTracer.get());
     }
 
     /**
+     * Creates a Builder with provided tracer.
+     *
      * @param tracer to use for this interceptor Creates a Builder with default configuration
      */
     public Builder(Tracer tracer) {
@@ -381,10 +366,13 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
       this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
-      this.clientSpanDecorator = null;
+      this.clientSpanDecorators = new HashMap<>();
+      this.clientCloseDecorators = new HashMap<>();
     }
 
     /**
+     * Provide operation name constructor.
+     *
      * @param operationNameConstructor to name all spans created by this interceptor
      * @return this Builder with configured operation name
      */
@@ -404,6 +392,8 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
+     * Provide traced attributes.
+     *
      * @param tracedAttributes to set as tags on client spans created by this interceptor
      * @return this Builder configured to trace attributes
      */
@@ -423,8 +413,10 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
+     * Provide the active span source.
+     *
      * @param activeSpanSource that provides a method of getting the active span before the client
-     * call
+     *                         call
      * @return this Builder configured to start client span as children of the span returned by
      * activeSpanSource.getActiveSpan()
      */
@@ -434,8 +426,10 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
+     * Provide the active span context source.
+     *
      * @param activeSpanContextSource that provides a method of getting the active span context
-     * before the client call
+     *                                before the client call
      * @return this Builder configured to start client span as children of the span context returned
      * by activeSpanContextSource.getActiveSpanContext()
      */
@@ -445,35 +439,34 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
-     * Decorates the client span with custom data
+     * Decorates the client span with custom data.
      *
      * @param clientSpanDecorator used to decorate the client span
      * @return this builder configured to decorate the client span
      */
     public Builder withClientSpanDecorator(ClientSpanDecorator clientSpanDecorator) {
-      this.clientSpanDecorator = clientSpanDecorator;
+      this.clientSpanDecorators.put(clientSpanDecorator.getClass(), clientSpanDecorator);
       return this;
     }
 
     /**
-     * Decorates the client span with custom data when the call is closed
+     * Decorates the client span with custom data when the call is closed.
      *
      * @param clientCloseDecorator used to decorate the client span when the call is closed
      * @return this builder configured to decorate the client span when the call is closed
      */
     public Builder withClientCloseDecorator(ClientCloseDecorator clientCloseDecorator) {
-      this.clientCloseDecorator = clientCloseDecorator;
+      this.clientCloseDecorators.put(clientCloseDecorator.getClass(), clientCloseDecorator);
       return this;
     }
 
     /**
+     * Build the ClientTracingInterceptor.
+     *
      * @return a ClientTracingInterceptor with this Builder's configuration
      */
     public ClientTracingInterceptor build() {
-      return new ClientTracingInterceptor(this.tracer, this.operationNameConstructor,
-          this.streaming, this.verbose, this.tracedAttributes, this.activeSpanSource,
-          this.activeSpanContextSource, this.clientSpanDecorator,
-          this.clientCloseDecorator);
+      return new ClientTracingInterceptor(this);
     }
   }
 

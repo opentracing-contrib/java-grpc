@@ -11,9 +11,11 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.grpc.BindableService;
 import io.grpc.Context;
@@ -52,17 +54,19 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   private final boolean streaming;
   private final boolean verbose;
   private final Set<ServerRequestAttribute> tracedAttributes;
-  private final ServerSpanDecorator serverSpanDecorator;
-  private final ServerCloseDecorator serverCloseDecorator;
+  private final ImmutableList<ServerSpanDecorator> serverSpanDecorators;
+  private final ImmutableList<ServerCloseDecorator> serverCloseDecorators;
 
   /**
-   * Instantiate interceptor using GlobalTracer to get tracer
+   * Instantiate interceptor using GlobalTracer to get tracer.
    */
   public ServerTracingInterceptor() {
     this(GlobalTracer.get());
   }
 
   /**
+   * Instantiate interceptor with provided tracer.
+   *
    * @param tracer used to trace requests
    */
   public ServerTracingInterceptor(Tracer tracer) {
@@ -71,26 +75,18 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     this.streaming = false;
     this.verbose = false;
     this.tracedAttributes = new HashSet<>();
-    this.serverSpanDecorator = null;
-    this.serverCloseDecorator = null;
+    this.serverSpanDecorators = ImmutableList.of();
+    this.serverCloseDecorators = ImmutableList.of();
   }
 
-  private ServerTracingInterceptor(
-      Tracer tracer,
-      OperationNameConstructor operationNameConstructor,
-      boolean streaming,
-      boolean verbose,
-      Set<ServerRequestAttribute> tracedAttributes,
-      ServerSpanDecorator serverSpanDecorator,
-      ServerCloseDecorator serverCloseDecorator) {
-
-    this.tracer = tracer;
-    this.operationNameConstructor = operationNameConstructor;
-    this.streaming = streaming;
-    this.verbose = verbose;
-    this.tracedAttributes = tracedAttributes;
-    this.serverSpanDecorator = serverSpanDecorator;
-    this.serverCloseDecorator = serverCloseDecorator;
+  private ServerTracingInterceptor(Builder builder) {
+    this.tracer = builder.tracer;
+    this.operationNameConstructor = builder.operationNameConstructor;
+    this.streaming = builder.streaming;
+    this.verbose = builder.verbose;
+    this.tracedAttributes = builder.tracedAttributes;
+    this.serverSpanDecorators = ImmutableList.copyOf(builder.serverSpanDecorators.values());
+    this.serverCloseDecorators = ImmutableList.copyOf(builder.serverCloseDecorators.values());
   }
 
   /**
@@ -133,7 +129,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
 
     try (Scope ignored = tracer.scopeManager().activate(span)) {
 
-      if (serverSpanDecorator != null) {
+      for (ServerSpanDecorator serverSpanDecorator : serverSpanDecorators) {
         serverSpanDecorator.interceptCall(span, call, headers);
       }
 
@@ -173,7 +169,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .put(GrpcFields.HEADERS, headers.toString())
                 .build());
           }
-          delegate().sendHeaders(headers);
+          super.sendHeaders(headers);
         }
 
         @Override
@@ -184,7 +180,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .put(Fields.MESSAGE, "Server sent response message")
                 .build());
           }
-          delegate().sendMessage(message);
+          super.sendMessage(message);
         }
 
         @Override
@@ -199,10 +195,10 @@ public class ServerTracingInterceptor implements ServerInterceptor {
             }
           }
           GrpcTags.GRPC_STATUS.set(span, status);
-          if (serverCloseDecorator != null) {
+          for (ServerCloseDecorator serverCloseDecorator : serverCloseDecorators) {
             serverCloseDecorator.close(span, status, trailers);
           }
-          delegate().close(status, trailers);
+          super.close(status, trailers);
         }
       };
 
@@ -213,6 +209,13 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           listenerWithContext) {
 
         @Override
+        public void onReady() {
+          try (Scope ignored = tracer.scopeManager().activate(span)) {
+            super.onReady();
+          }
+        }
+
+        @Override
         public void onMessage(ReqT message) {
           if (streaming || verbose) {
             span.log(ImmutableMap.<String, Object>builder()
@@ -221,7 +224,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().onMessage(message);
+            super.onMessage(message);
           }
         }
 
@@ -234,7 +237,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
                 .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().onHalfClose();
+            super.onHalfClose();
           }
 
         }
@@ -249,7 +252,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           }
           GrpcTags.GRPC_STATUS.set(span, Status.CANCELLED);
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().onCancel();
+            super.onCancel();
           } finally {
             span.finish();
           }
@@ -265,16 +268,9 @@ public class ServerTracingInterceptor implements ServerInterceptor {
           }
           // Server span may complete with non-OK ServerCall.close(status).
           try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().onComplete();
+            super.onComplete();
           } finally {
             span.finish();
-          }
-        }
-
-        @Override
-        public void onReady() {
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            delegate().onReady();
           }
         }
       };
@@ -286,7 +282,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     Map<String, Object> fields = null;
     Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName);
     try {
-      SpanContext parentSpanCtx = tracer.extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
+      SpanContext parentSpanCtx = tracer
+          .extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
       if (parentSpanCtx != null) {
         spanBuilder = spanBuilder.asChildOf(parentSpanCtx);
       }
@@ -317,17 +314,19 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     private boolean streaming;
     private boolean verbose;
     private Set<ServerRequestAttribute> tracedAttributes;
-    private ServerSpanDecorator serverSpanDecorator;
-    private ServerCloseDecorator serverCloseDecorator;
+    private Map<Class<?>, ServerSpanDecorator> serverSpanDecorators;
+    private Map<Class<?>, ServerCloseDecorator> serverCloseDecorators;
 
     /**
-     * Creates a Builder using GlobalTracer to get tracer
+     * Creates a Builder using GlobalTracer to get tracer.
      */
     public Builder() {
       this(GlobalTracer.get());
     }
 
     /**
+     * Creates a Builder with provided tracer.
+     *
      * @param tracer to use for this interceptor Creates a Builder with default configuration
      */
     public Builder(Tracer tracer) {
@@ -336,9 +335,13 @@ public class ServerTracingInterceptor implements ServerInterceptor {
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
+      this.serverSpanDecorators = new HashMap<>();
+      this.serverCloseDecorators = new HashMap<>();
     }
 
     /**
+     * Provide operation name.
+     *
      * @param operationNameConstructor for all spans created by this interceptor
      * @return this Builder with configured operation name
      */
@@ -348,6 +351,8 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
+     * Provide traced attributes.
+     *
      * @param attributes to set as tags on server spans created by this interceptor
      * @return this Builder configured to trace request attributes
      */
@@ -383,7 +388,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
      * @return this Builder configured to decorate server span
      */
     public Builder withServerSpanDecorator(ServerSpanDecorator serverSpanDecorator) {
-      this.serverSpanDecorator = serverSpanDecorator;
+      this.serverSpanDecorators.put(serverSpanDecorator.getClass(), serverSpanDecorator);
       return this;
     }
 
@@ -394,17 +399,17 @@ public class ServerTracingInterceptor implements ServerInterceptor {
      * @return this Builder configured to decorate server span when the gRPC call is closed
      */
     public Builder withServerCloseDecorator(ServerCloseDecorator serverCloseDecorator) {
-      this.serverCloseDecorator = serverCloseDecorator;
+      this.serverCloseDecorators.put(serverCloseDecorator.getClass(), serverCloseDecorator);
       return this;
     }
 
     /**
+     * Build the ServerTracingInterceptor.
+     *
      * @return a ServerTracingInterceptor with this Builder's configuration
      */
     public ServerTracingInterceptor build() {
-      return new ServerTracingInterceptor(this.tracer, this.operationNameConstructor,
-          this.streaming, this.verbose, this.tracedAttributes, this.serverSpanDecorator,
-          this.serverCloseDecorator);
+      return new ServerTracingInterceptor(this);
     }
   }
 
