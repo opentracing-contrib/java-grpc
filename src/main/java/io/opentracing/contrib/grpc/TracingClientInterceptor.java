@@ -32,6 +32,7 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
+import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
@@ -59,28 +60,6 @@ public class TracingClientInterceptor implements ClientInterceptor {
   private final ImmutableList<ClientSpanDecorator> clientSpanDecorators;
   private final ImmutableList<ClientCloseDecorator> clientCloseDecorators;
 
-  /** Instantiate interceptor using GlobalTracer to get tracer. */
-  public TracingClientInterceptor() {
-    this(GlobalTracer.get());
-  }
-
-  /**
-   * Instantiate interceptor with provided tracer.
-   *
-   * @param tracer to use to trace requests.
-   */
-  public TracingClientInterceptor(Tracer tracer) {
-    this.tracer = tracer;
-    this.operationNameConstructor = OperationNameConstructor.DEFAULT;
-    this.streaming = false;
-    this.verbose = false;
-    this.tracedAttributes = new HashSet<>();
-    this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
-    this.activeSpanContextSource = null;
-    this.clientSpanDecorators = ImmutableList.of();
-    this.clientCloseDecorators = ImmutableList.of();
-  }
-
   private TracingClientInterceptor(Builder builder) {
     this.tracer = builder.tracer;
     this.operationNameConstructor = builder.operationNameConstructor;
@@ -91,6 +70,15 @@ public class TracingClientInterceptor implements ClientInterceptor {
     this.activeSpanContextSource = builder.activeSpanContextSource;
     this.clientSpanDecorators = ImmutableList.copyOf(builder.clientSpanDecorators.values());
     this.clientCloseDecorators = ImmutableList.copyOf(builder.clientCloseDecorators.values());
+  }
+
+  /**
+   * Creates a new {@link TracingClientInterceptor.Builder}.
+   *
+   * @return the tracing client interceptor builder
+   */
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
@@ -244,13 +232,6 @@ public class TracingClientInterceptor implements ClientInterceptor {
         }
 
         @Override
-        public void request(int numMessages) {
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            super.request(numMessages);
-          }
-        }
-
-        @Override
         public void sendMessage(ReqT message) {
           if (streaming || verbose) {
             span.log(
@@ -340,7 +321,7 @@ public class TracingClientInterceptor implements ClientInterceptor {
   /** Builds the configuration of a TracingClientInterceptor. */
   public static class Builder {
 
-    private final Tracer tracer;
+    private Tracer tracer;
     private OperationNameConstructor operationNameConstructor;
     private boolean streaming;
     private boolean verbose;
@@ -350,25 +331,28 @@ public class TracingClientInterceptor implements ClientInterceptor {
     private Map<Class<?>, ClientSpanDecorator> clientSpanDecorators;
     private Map<Class<?>, ClientCloseDecorator> clientCloseDecorators;
 
-    /** Creates a Builder using GlobalTracer to get tracer. */
+    /** Creates a Builder with GlobalTracer if present else NoopTracer. */
     public Builder() {
-      this(GlobalTracer.get());
-    }
-
-    /**
-     * Creates a Builder with provided tracer.
-     *
-     * @param tracer to use for this interceptor Creates a Builder with default configuration
-     */
-    public Builder(Tracer tracer) {
-      this.tracer = tracer;
+      this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
-      this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
+      this.activeSpanSource = ActiveSpanSource.NONE;
+      this.activeSpanContextSource = ActiveSpanContextSource.NONE;
       this.clientSpanDecorators = new HashMap<>();
       this.clientCloseDecorators = new HashMap<>();
+    }
+
+    /**
+     * Provide the {@link Tracer}.
+     *
+     * @param tracer the tracer
+     * @return this Builder with configured tracer
+     */
+    public Builder withTracer(Tracer tracer) {
+      this.tracer = tracer;
+      return this;
     }
 
     /**

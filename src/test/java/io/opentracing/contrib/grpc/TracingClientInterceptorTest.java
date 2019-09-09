@@ -84,7 +84,8 @@ public class TracingClientInterceptorTest {
 
   @Test
   public void testTracedClientBasic() {
-    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(clientTracer);
+    TracingClientInterceptor tracingInterceptor =
+        TracingClientInterceptor.newBuilder().withTracer(clientTracer).build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -107,7 +108,8 @@ public class TracingClientInterceptorTest {
   @Test
   public void testTracedClientTwoInterceptors() {
     SecondClientInterceptor secondInterceptor = new SecondClientInterceptor(clientTracer);
-    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(clientTracer);
+    TracingClientInterceptor tracingInterceptor =
+        TracingClientInterceptor.newBuilder().withTracer(clientTracer).build();
     TracedClient client =
         new TracedClient(grpcServer.getChannel(), secondInterceptor, tracingInterceptor);
 
@@ -131,7 +133,7 @@ public class TracingClientInterceptorTest {
   @Test
   public void testTracedClientWithVerbosity() {
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withVerbosity().build();
+        new TracingClientInterceptor.Builder().withTracer(clientTracer).withVerbosity().build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -167,7 +169,7 @@ public class TracingClientInterceptorTest {
   @Test
   public void testTracedClientWithStreaming() {
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withStreaming().build();
+        TracingClientInterceptor.newBuilder().withTracer(clientTracer).withStreaming().build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -199,7 +201,8 @@ public class TracingClientInterceptorTest {
   @Test
   public void testTracedClientWithOperationName() {
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer)
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
             .withOperationName(
                 new OperationNameConstructor() {
                   @Override
@@ -232,7 +235,8 @@ public class TracingClientInterceptorTest {
   @Test
   public void testTracedClientWithTracedAttributes() {
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer)
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
             .withTracedAttributes(TracingClientInterceptor.ClientRequestAttribute.values())
             .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), 50, "gzip", tracingInterceptor);
@@ -268,7 +272,8 @@ public class TracingClientInterceptorTest {
           }
         };
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer)
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
             .withActiveSpanSource(activeSpanSource)
             .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
@@ -301,7 +306,8 @@ public class TracingClientInterceptorTest {
           }
         };
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer)
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
             .withActiveSpanContextSource(activeSpanContextSource)
             .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
@@ -343,7 +349,8 @@ public class TracingClientInterceptorTest {
         };
 
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer)
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
             .withClientSpanDecorator(spanTagger)
             .withClientSpanDecorator(spanLogger)
             .build();
@@ -391,7 +398,8 @@ public class TracingClientInterceptorTest {
         };
 
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer)
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
             .withClientCloseDecorator(closeTagger)
             .withClientCloseDecorator(closeLogger)
             .build();

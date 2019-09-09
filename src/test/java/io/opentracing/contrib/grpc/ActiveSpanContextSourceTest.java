@@ -28,7 +28,7 @@ public class ActiveSpanContextSourceTest {
   private final MockTracer tracer = new MockTracer();
 
   @Before
-  public void before() {
+  public void setUp() {
     tracer.reset();
   }
 

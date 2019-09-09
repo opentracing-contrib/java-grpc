@@ -86,7 +86,7 @@ public class TracingServerInterceptorTest {
   private TracedClient client;
 
   @Before
-  public void before() {
+  public void setUp() {
     GlobalTracerTestUtil.resetGlobalTracer();
     serverTracer.reset();
     client = new TracedClient(grpcServer.getChannel());
@@ -94,7 +94,8 @@ public class TracingServerInterceptorTest {
 
   @Test
   public void testTracedServerBasic() {
-    TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor(serverTracer);
+    TracingServerInterceptor tracingInterceptor =
+        TracingServerInterceptor.newBuilder().withTracer(serverTracer).build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -117,7 +118,8 @@ public class TracingServerInterceptorTest {
 
   @Test
   public void testTracedServerTwoInterceptors() {
-    TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor(serverTracer);
+    TracingServerInterceptor tracingInterceptor =
+        TracingServerInterceptor.newBuilder().withTracer(serverTracer).build();
     SecondServerInterceptor secondServerInterceptor = new SecondServerInterceptor(serverTracer);
     TracedService.addGeeterService(
         grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
@@ -143,7 +145,7 @@ public class TracingServerInterceptorTest {
   @Test
   public void testTracedServerWithVerbosity() {
     TracingServerInterceptor tracingInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withVerbosity().build();
+        TracingServerInterceptor.newBuilder().withTracer(serverTracer).withVerbosity().build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -179,7 +181,7 @@ public class TracingServerInterceptorTest {
   @Test
   public void testTracedServerWithStreaming() {
     TracingServerInterceptor tracingInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withStreaming().build();
+        TracingServerInterceptor.newBuilder().withTracer(serverTracer).withStreaming().build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -212,7 +214,8 @@ public class TracingServerInterceptorTest {
   @Test
   public void testTracedServerWithCustomOperationName() {
     TracingServerInterceptor tracingInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer)
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
             .withOperationName(
                 new OperationNameConstructor() {
                   @Override
@@ -245,7 +248,8 @@ public class TracingServerInterceptorTest {
   @Test
   public void testTracedServerWithTracedAttributes() {
     TracingServerInterceptor tracingInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer)
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
             .withTracedAttributes(TracingServerInterceptor.ServerRequestAttribute.values())
             .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
@@ -290,7 +294,8 @@ public class TracingServerInterceptorTest {
         };
 
     TracingServerInterceptor tracingInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer)
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
             .withServerSpanDecorator(spanTagger)
             .withServerSpanDecorator(spanLogger)
             .build();
@@ -337,7 +342,8 @@ public class TracingServerInterceptorTest {
           }
         };
     TracingServerInterceptor tracingInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer)
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
             .withServerCloseDecorator(closeTagger)
             .withServerCloseDecorator(closeLogger)
             .build();
@@ -368,7 +374,9 @@ public class TracingServerInterceptorTest {
         .extract(eq(Format.Builtin.HTTP_HEADERS), any(TextMapAdapter.class));
 
     Span span =
-        new TracingServerInterceptor(spyTracer)
+        TracingServerInterceptor.newBuilder()
+            .withTracer(spyTracer)
+            .build()
             .getSpanFromHeaders(Collections.<String, String>emptyMap(), "operationName");
     assertNotNull("span is not null", span);
     MockSpan mockSpan = (MockSpan) span;
@@ -386,7 +394,9 @@ public class TracingServerInterceptorTest {
         .extract(eq(Format.Builtin.HTTP_HEADERS), any(TextMapAdapter.class));
 
     Span span =
-        new TracingServerInterceptor(spyTracer)
+        TracingServerInterceptor.newBuilder()
+            .withTracer(spyTracer)
+            .build()
             .getSpanFromHeaders(Collections.<String, String>emptyMap(), "operationName");
     assertNotNull("span is not null", span);
     List<MockSpan.LogEntry> logEntries = ((MockSpan) span).logEntries();

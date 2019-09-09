@@ -54,12 +54,6 @@ public class SecondClientInterceptor implements ClientInterceptor {
       }
 
       @Override
-      public void request(int numMessages) {
-        assertNotNull(tracer.activeSpan());
-        super.request(numMessages);
-      }
-
-      @Override
       public void sendMessage(ReqT message) {
         assertNotNull(tracer.activeSpan());
         super.sendMessage(message);

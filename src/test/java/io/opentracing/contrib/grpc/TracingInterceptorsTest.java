@@ -59,7 +59,7 @@ public class TracingInterceptorsTest {
   @Rule public GrpcServerRule grpcServer = new GrpcServerRule();
 
   @Before
-  public void before() {
+  public void setUp() {
     GlobalTracerTestUtil.resetGlobalTracer();
     clientTracer.reset();
     serverTracer.reset();
@@ -70,11 +70,17 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedClientAndServerSuccess() {
     TracingClientInterceptor clientInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withVerbosity().build();
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
+            .withVerbosity()
+            .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
     TracingServerInterceptor serverInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withVerbosity().build();
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withVerbosity()
+            .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());
@@ -151,7 +157,10 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedClientSendError() {
     TracingClientInterceptor clientInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withVerbosity().build();
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
+            .withVerbosity()
+            .build();
     ClientInterceptor clientSendError =
         new ClientInterceptor() {
           @Override
@@ -170,7 +179,10 @@ public class TracingInterceptorsTest {
         new TracedClient(grpcServer.getChannel(), clientSendError, clientInterceptor);
 
     TracingServerInterceptor serverInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withVerbosity().build();
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withVerbosity()
+            .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
     assertNull("call should return null", client.greet());
@@ -223,7 +235,10 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedClientReceiveError() {
     TracingClientInterceptor clientInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withVerbosity().build();
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
+            .withVerbosity()
+            .build();
     ClientInterceptor clientReceiveError =
         new ClientInterceptor() {
           @Override
@@ -251,7 +266,10 @@ public class TracingInterceptorsTest {
         new TracedClient(grpcServer.getChannel(), clientReceiveError, clientInterceptor);
 
     TracingServerInterceptor serverInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withVerbosity().build();
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withVerbosity()
+            .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
     assertNull("call should return null", client.greet());
@@ -310,11 +328,17 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedServerReceiveError() {
     TracingClientInterceptor clientInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withVerbosity().build();
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
+            .withVerbosity()
+            .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
     TracingServerInterceptor serverInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withVerbosity().build();
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withVerbosity()
+            .build();
     ServerInterceptor serverReceiveError =
         new ServerInterceptor() {
           @Override
@@ -390,11 +414,17 @@ public class TracingInterceptorsTest {
   @Test
   public void testTracedServerSendError() {
     TracingClientInterceptor clientInterceptor =
-        new TracingClientInterceptor.Builder(clientTracer).withVerbosity().build();
+        TracingClientInterceptor.newBuilder()
+            .withTracer(clientTracer)
+            .withVerbosity()
+            .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
     TracingServerInterceptor serverInterceptor =
-        new TracingServerInterceptor.Builder(serverTracer).withVerbosity().build();
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withVerbosity()
+            .build();
     ServerInterceptor serverSendError =
         new ServerInterceptor() {
           @Override

@@ -34,6 +34,7 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
+import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapAdapter;
 import io.opentracing.tag.Tags;
@@ -55,26 +56,6 @@ public class TracingServerInterceptor implements ServerInterceptor {
   private final ImmutableList<ServerSpanDecorator> serverSpanDecorators;
   private final ImmutableList<ServerCloseDecorator> serverCloseDecorators;
 
-  /** Instantiate interceptor using GlobalTracer to get tracer. */
-  public TracingServerInterceptor() {
-    this(GlobalTracer.get());
-  }
-
-  /**
-   * Instantiate interceptor with provided tracer.
-   *
-   * @param tracer used to trace requests
-   */
-  public TracingServerInterceptor(Tracer tracer) {
-    this.tracer = tracer;
-    this.operationNameConstructor = OperationNameConstructor.DEFAULT;
-    this.streaming = false;
-    this.verbose = false;
-    this.tracedAttributes = new HashSet<>();
-    this.serverSpanDecorators = ImmutableList.of();
-    this.serverCloseDecorators = ImmutableList.of();
-  }
-
   private TracingServerInterceptor(Builder builder) {
     this.tracer = builder.tracer;
     this.operationNameConstructor = builder.operationNameConstructor;
@@ -83,6 +64,15 @@ public class TracingServerInterceptor implements ServerInterceptor {
     this.tracedAttributes = builder.tracedAttributes;
     this.serverSpanDecorators = ImmutableList.copyOf(builder.serverSpanDecorators.values());
     this.serverCloseDecorators = ImmutableList.copyOf(builder.serverCloseDecorators.values());
+  }
+
+  /**
+   * Creates a new {@link TracingServerInterceptor.Builder}.
+   *
+   * @return the tracing server interceptor builder
+   */
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
@@ -313,7 +303,7 @@ public class TracingServerInterceptor implements ServerInterceptor {
   /** Builds the configuration of a TracingServerInterceptor. */
   public static class Builder {
 
-    private final Tracer tracer;
+    private Tracer tracer;
     private OperationNameConstructor operationNameConstructor;
     private boolean streaming;
     private boolean verbose;
@@ -321,24 +311,26 @@ public class TracingServerInterceptor implements ServerInterceptor {
     private Map<Class<?>, ServerSpanDecorator> serverSpanDecorators;
     private Map<Class<?>, ServerCloseDecorator> serverCloseDecorators;
 
-    /** Creates a Builder using GlobalTracer to get tracer. */
-    public Builder() {
-      this(GlobalTracer.get());
-    }
-
-    /**
-     * Creates a Builder with provided tracer.
-     *
-     * @param tracer to use for this interceptor Creates a Builder with default configuration
-     */
-    public Builder(Tracer tracer) {
-      this.tracer = tracer;
+    /** Creates a Builder with GlobalTracer if present else NoopTracer. */
+    private Builder() {
+      this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
       this.serverSpanDecorators = new HashMap<>();
       this.serverCloseDecorators = new HashMap<>();
+    }
+
+    /**
+     * Provide the {@link Tracer}.
+     *
+     * @param tracer the tracer
+     * @return this Builder with configured tracer
+     */
+    public Builder withTracer(Tracer tracer) {
+      this.tracer = tracer;
+      return this;
     }
 
     /**

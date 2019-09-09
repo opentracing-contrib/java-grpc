@@ -111,8 +111,8 @@ A `TracingServerInterceptor` uses default settings, which you can override by cr
 A `TracingClientInterceptor` also has default settings, which you can override by creating it using a `TracingClientInterceptor.Builder`.
 
 - `withOperationName(String operationName)`: Define how the operation name is constructed for all spans created for this intercepted client. Default is the name of the RPC method. More details in the `Operation Name` section.
-- `withActiveSpanSource(ActiveSpanSource activeSpanSource)`: Define how to extract the current active span, if any. This is needed if you want your client to continue a trace instead of starting a new one. More details in the `Active Span Sources` section.
-- `withActiveSpanContextSource(ActiveSpanContextSource activeSpanContextSource)`: Define how to extract the current active span context, if any. This is needed if you want your client to continue a trace instead of starting a new one. More details in the `Active Span Context Sources` section.
+- `withActiveSpanSource(ActiveSpanSource activeSpanSource)`: Define how to extract the current active span, if any. More details in the `Active Span Sources` section.
+- `withActiveSpanContextSource(ActiveSpanContextSource activeSpanContextSource)`: Define how to extract the current active span context, if any. More details in the `Active Span Context Sources` section.
 - `withStreaming()`: Logs to the client span whenever a message is sent or a response is received. *Note:* This package supports streaming but has not been rigorously tested. If you come across any issues, please let us know.
 - `withVerbosity()`: Logs to the client span additional events, such as call started, message sent, half close (client finished sending messages), response received, and call complete. Default only logs if a call is cancelled.
 - `withTracedAttributes(ClientRequestAttribute... attrs)`: Sets tags on the client span in case you want to track information about the RPC call. See ClientRequestAttribute.java for a list of traceable request attributes.
@@ -237,8 +237,8 @@ import io.opentracing.Span;
 
 We also provide two built-in implementations:
 
-- `ActiveSpanSource.GRPC_CONTEXT` uses the current `io.grpc.Context` and returns the active span for `OpenTracingContextKey`. This is the default active span source.
-- `ActiveSpanSource.NONE` always returns null as the active span, which means the client will always start a new trace
+- `ActiveSpanSource.GRPC_CONTEXT` uses the current `io.grpc.Context` and returns the active span for `OpenTracingContextKey`. 
+- `ActiveSpanSource.NONE` always returns null as the active span, which means the client will retrieve the span from `io.opentracing.Tracer.activeSpan()`. This is the default active span source.
 
 ## Active Span Context Sources
 
@@ -263,7 +263,7 @@ import io.opentracing.Span;
 We also provide two built-in implementations:
 
 - `ActiveSpanContextSource.GRPC_CONTEXT` uses the current `io.grpc.Context` and returns the active span context for `OpenTracingContextKey`.
-- `ActiveSpanContextSource.NONE` always returns null as the active span context, which means the client will always start a new trace
+- `ActiveSpanContextSource.NONE` always returns null as the active span context, which means the client will retrieve the span from `io.opentracing.Tracer.activeSpan().context()`. This is the default active span context source.
 
 ## Custom Span Decorators
 
