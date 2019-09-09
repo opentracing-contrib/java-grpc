@@ -43,19 +43,21 @@ public class OpenTracingContextKeyTest {
   @Test
   public void testGetSpanContextKey() {
     Key<SpanContext> key = OpenTracingContextKey.getSpanContextKey();
-    assertEquals("Key should have correct name", key.toString(),
-        OpenTracingContextKey.KEY_CONTEXT_NAME);
+    assertEquals(
+        "Key should have correct name", key.toString(), OpenTracingContextKey.KEY_CONTEXT_NAME);
   }
 
   @Test
   public void testNoActiveSpan() {
-    assertNull("activeSpan() should return null when no span is active",
+    assertNull(
+        "activeSpan() should return null when no span is active",
         OpenTracingContextKey.activeSpan());
   }
 
   @Test
   public void testNoActiveSpanContext() {
-    assertNull("activeSpanContext() should return null when no span context is active",
+    assertNull(
+        "activeSpanContext() should return null when no span context is active",
         OpenTracingContextKey.activeSpanContext());
   }
 
@@ -76,8 +78,8 @@ public class OpenTracingContextKeyTest {
   @Test
   public void testGetActiveSpanContext() {
     Span span = tracer.buildSpan("s0").start();
-    Context ctx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
-        span.context());
+    Context ctx =
+        Context.current().withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
     Context previousCtx = ctx.attach();
 
     assertEquals(OpenTracingContextKey.activeSpanContext(), span.context());
@@ -111,13 +113,14 @@ public class OpenTracingContextKeyTest {
   @Test
   public void testMultipleContextLayersForSpanContext() {
     Span parentSpan = tracer.buildSpan("s0").start();
-    Context parentCtx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
-        parentSpan.context());
+    Context parentCtx =
+        Context.current()
+            .withValue(OpenTracingContextKey.getSpanContextKey(), parentSpan.context());
     Context previousCtx = parentCtx.attach();
 
     Span childSpan = tracer.buildSpan("s1").start();
-    Context childCtx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
-        childSpan.context());
+    Context childCtx =
+        Context.current().withValue(OpenTracingContextKey.getSpanContextKey(), childSpan.context());
     parentCtx = childCtx.attach();
     assertEquals(OpenTracingContextKey.activeSpanContext(), childSpan.context());
 

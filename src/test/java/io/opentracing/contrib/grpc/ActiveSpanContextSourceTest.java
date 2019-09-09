@@ -50,22 +50,25 @@ public class ActiveSpanContextSourceTest {
   @Test
   public void testDefaultGrpc() {
     ActiveSpanContextSource ss = ActiveSpanContextSource.GRPC_CONTEXT;
-    assertNull("active span context should be null, no span context in OpenTracingContextKey",
+    assertNull(
+        "active span context should be null, no span context in OpenTracingContextKey",
         ss.getActiveSpanContext());
 
     Span span = tracer.buildSpan("s0").start();
-    Context ctx = Context.current()
-        .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
+    Context ctx =
+        Context.current().withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
     Context previousCtx = ctx.attach();
 
-    assertEquals("active span context should be OpenTracingContextKey.activeSpanContext()",
-        ss.getActiveSpanContext(), span.context());
+    assertEquals(
+        "active span context should be OpenTracingContextKey.activeSpanContext()",
+        ss.getActiveSpanContext(),
+        span.context());
 
     ctx.detach(previousCtx);
     span.finish();
 
-    assertNull("active span context should be null, no span context in OpenTracingContextKey",
+    assertNull(
+        "active span context should be null, no span context in OpenTracingContextKey",
         ss.getActiveSpanContext());
   }
-
 }

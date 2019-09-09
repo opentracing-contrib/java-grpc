@@ -50,24 +50,23 @@ public class GrpcTagsTest {
 
   @Test
   public void testPeerAddressSocket() {
-    final InetSocketAddress address = new InetSocketAddress("127.0.0.1",
-        ThreadLocalRandom.current().nextInt(65535));
-    final Attributes attributes = Attributes.newBuilder()
-        .set(Grpc.TRANSPORT_ATTR_REMOTE_ADDR, address)
-        .build();
+    final InetSocketAddress address =
+        new InetSocketAddress("127.0.0.1", ThreadLocalRandom.current().nextInt(65535));
+    final Attributes attributes =
+        Attributes.newBuilder().set(Grpc.TRANSPORT_ATTR_REMOTE_ADDR, address).build();
     MockSpan span = new MockTracer().buildSpan("").start();
     GrpcTags.PEER_ADDRESS.set(span, attributes);
     assertThat(span.tags())
-        .containsOnly(MapEntry.entry(GrpcTags.PEER_ADDRESS.getKey(),
-            address.getHostString() + ':' + address.getPort()));
+        .containsOnly(
+            MapEntry.entry(
+                GrpcTags.PEER_ADDRESS.getKey(), address.getHostString() + ':' + address.getPort()));
   }
 
   @Test
   public void testPeerAddressInProcess() {
     final InProcessSocketAddress address = new InProcessSocketAddress(UUID.randomUUID().toString());
-    final Attributes attributes = Attributes.newBuilder()
-        .set(Grpc.TRANSPORT_ATTR_REMOTE_ADDR, address)
-        .build();
+    final Attributes attributes =
+        Attributes.newBuilder().set(Grpc.TRANSPORT_ATTR_REMOTE_ADDR, address).build();
     MockSpan span = new MockTracer().buildSpan("").start();
     GrpcTags.PEER_ADDRESS.set(span, attributes);
     assertThat(span.tags())

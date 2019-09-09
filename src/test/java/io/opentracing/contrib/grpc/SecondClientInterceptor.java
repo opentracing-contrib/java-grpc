@@ -16,7 +16,6 @@ package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertNotNull;
 
-import io.grpc.Attributes;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
@@ -38,9 +37,7 @@ public class SecondClientInterceptor implements ClientInterceptor {
 
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
-      MethodDescriptor<ReqT, RespT> method,
-      CallOptions callOptions,
-      Channel next) {
+      MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
 
     assertNotNull(tracer.activeSpan());
 
@@ -50,51 +47,34 @@ public class SecondClientInterceptor implements ClientInterceptor {
       @Override
       public void start(Listener<RespT> responseListener, Metadata headers) {
         assertNotNull(tracer.activeSpan());
-        delegate().start(new ForwardingClientCallListener
-            .SimpleForwardingClientCallListener<RespT>(responseListener) {
-        }, headers);
+        super.start(
+            new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(
+                responseListener) {},
+            headers);
       }
 
       @Override
       public void request(int numMessages) {
         assertNotNull(tracer.activeSpan());
-        delegate().request(numMessages);
-      }
-
-      @Override
-      public void cancel(@Nullable String message, @Nullable Throwable cause) {
-        assertNotNull(tracer.activeSpan());
-        delegate().cancel(message, cause);
-      }
-
-      @Override
-      public void halfClose() {
-        assertNotNull(tracer.activeSpan());
-        delegate().halfClose();
+        super.request(numMessages);
       }
 
       @Override
       public void sendMessage(ReqT message) {
         assertNotNull(tracer.activeSpan());
-        delegate().sendMessage(message);
+        super.sendMessage(message);
       }
 
       @Override
-      public boolean isReady() {
+      public void halfClose() {
         assertNotNull(tracer.activeSpan());
-        return delegate().isReady();
+        super.halfClose();
       }
 
       @Override
-      public void setMessageCompression(boolean enabled) {
+      public void cancel(@Nullable String message, @Nullable Throwable cause) {
         assertNotNull(tracer.activeSpan());
-        delegate().setMessageCompression(enabled);
-      }
-
-      @Override
-      public Attributes getAttributes() {
-        assertNotNull(tracer.activeSpan());
-        return delegate().getAttributes();
+        super.cancel(message, cause);
       }
     };
   }

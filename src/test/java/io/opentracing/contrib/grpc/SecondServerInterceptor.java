@@ -16,7 +16,6 @@ package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertNotNull;
 
-import io.grpc.Attributes;
 import io.grpc.ForwardingServerCall;
 import io.grpc.ForwardingServerCallListener;
 import io.grpc.Metadata;
@@ -37,106 +36,63 @@ public class SecondServerInterceptor implements ServerInterceptor {
 
   @Override
   public <ReqT, RespT> Listener<ReqT> interceptCall(
-      ServerCall<ReqT, RespT> call,
-      Metadata headers,
-      ServerCallHandler<ReqT, RespT> next) {
+      ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
     assertNotNull(tracer.activeSpan());
 
-    call = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
+    call =
+        new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
 
-      @Override
-      public void request(int numMessages) {
-        assertNotNull(tracer.activeSpan());
-        delegate().request(numMessages);
-      }
+          @Override
+          public void sendHeaders(Metadata headers) {
+            assertNotNull(tracer.activeSpan());
+            super.sendHeaders(headers);
+          }
 
-      @Override
-      public void sendHeaders(Metadata headers) {
-        assertNotNull(tracer.activeSpan());
-        delegate().sendHeaders(headers);
-      }
+          @Override
+          public void sendMessage(RespT message) {
+            assertNotNull(tracer.activeSpan());
+            super.sendMessage(message);
+          }
 
-      @Override
-      public void sendMessage(RespT message) {
-        assertNotNull(tracer.activeSpan());
-        delegate().sendMessage(message);
-      }
-
-      @Override
-      public boolean isReady() {
-        assertNotNull(tracer.activeSpan());
-        return delegate().isReady();
-      }
-
-      @Override
-      public void close(Status status, Metadata trailers) {
-        assertNotNull(tracer.activeSpan());
-        delegate().close(status, trailers);
-      }
-
-      @Override
-      public boolean isCancelled() {
-        assertNotNull(tracer.activeSpan());
-        return delegate().isCancelled();
-      }
-
-      @Override
-      public void setMessageCompression(boolean enabled) {
-        assertNotNull(tracer.activeSpan());
-        delegate().setMessageCompression(enabled);
-      }
-
-      @Override
-      public void setCompression(String compressor) {
-        assertNotNull(tracer.activeSpan());
-        delegate().setCompression(compressor);
-      }
-
-      @Override
-      public Attributes getAttributes() {
-        assertNotNull(tracer.activeSpan());
-        return delegate().getAttributes();
-      }
-
-      @Override
-      public String getAuthority() {
-        assertNotNull(tracer.activeSpan());
-        return delegate().getAuthority();
-      }
-    };
+          @Override
+          public void close(Status status, Metadata trailers) {
+            assertNotNull(tracer.activeSpan());
+            super.close(status, trailers);
+          }
+        };
 
     return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
         next.startCall(call, headers)) {
 
       @Override
+      public void onReady() {
+        assertNotNull(tracer.activeSpan());
+        super.onReady();
+      }
+
+      @Override
       public void onMessage(ReqT message) {
         assertNotNull(tracer.activeSpan());
-        delegate().onMessage(message);
+        super.onMessage(message);
       }
 
       @Override
       public void onHalfClose() {
         assertNotNull(tracer.activeSpan());
-        delegate().onHalfClose();
+        super.onHalfClose();
       }
 
       @Override
       public void onCancel() {
         assertNotNull(tracer.activeSpan());
-        delegate().onCancel();
+        super.onCancel();
       }
 
       @Override
       public void onComplete() {
         assertNotNull(tracer.activeSpan());
-        delegate().onComplete();
-      }
-
-      @Override
-      public void onReady() {
-        assertNotNull(tracer.activeSpan());
-        delegate().onReady();
+        super.onComplete();
       }
     };
   }

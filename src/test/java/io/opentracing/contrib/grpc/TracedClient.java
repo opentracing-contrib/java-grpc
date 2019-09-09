@@ -35,9 +35,10 @@ class TracedClient {
       long deadline,
       String compression,
       ClientInterceptor... interceptors) {
-    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
-        .withDeadlineAfter(deadline, TimeUnit.MILLISECONDS)
-        .withCompression(compression);
+    blockingStub =
+        GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
+            .withDeadlineAfter(deadline, TimeUnit.MILLISECONDS)
+            .withCompression(compression);
   }
 
   HelloReply greet() {
