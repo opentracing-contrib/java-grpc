@@ -50,8 +50,8 @@ final class GrpcFields {
   }
 
   private static void logCallError(Span span, String message, Throwable cause, String name) {
-    ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
-        .put(Fields.EVENT, GrpcFields.ERROR);
+    ImmutableMap.Builder<String, Object> builder =
+        ImmutableMap.<String, Object>builder().put(Fields.EVENT, GrpcFields.ERROR);
     String causeMessage = null;
     if (cause != null) {
       builder.put(Fields.ERROR_OBJECT, cause);

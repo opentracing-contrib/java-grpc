@@ -34,6 +34,7 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
+import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapAdapter;
 import io.opentracing.tag.Tags;
@@ -44,9 +45,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * An interceptor that applies tracing via OpenTracing to all requests to the server.
- */
+/** An interceptor that applies tracing via OpenTracing to all requests to the server. */
 public class TracingServerInterceptor implements ServerInterceptor {
 
   private final Tracer tracer;
@@ -57,28 +56,6 @@ public class TracingServerInterceptor implements ServerInterceptor {
   private final ImmutableList<ServerSpanDecorator> serverSpanDecorators;
   private final ImmutableList<ServerCloseDecorator> serverCloseDecorators;
 
-  /**
-   * Instantiate interceptor using GlobalTracer to get tracer.
-   */
-  public TracingServerInterceptor() {
-    this(GlobalTracer.get());
-  }
-
-  /**
-   * Instantiate interceptor with provided tracer.
-   *
-   * @param tracer used to trace requests
-   */
-  public TracingServerInterceptor(Tracer tracer) {
-    this.tracer = tracer;
-    this.operationNameConstructor = OperationNameConstructor.DEFAULT;
-    this.streaming = false;
-    this.verbose = false;
-    this.tracedAttributes = new HashSet<>();
-    this.serverSpanDecorators = ImmutableList.of();
-    this.serverCloseDecorators = ImmutableList.of();
-  }
-
   private TracingServerInterceptor(Builder builder) {
     this.tracer = builder.tracer;
     this.operationNameConstructor = builder.operationNameConstructor;
@@ -87,6 +64,15 @@ public class TracingServerInterceptor implements ServerInterceptor {
     this.tracedAttributes = builder.tracedAttributes;
     this.serverSpanDecorators = ImmutableList.copyOf(builder.serverSpanDecorators.values());
     this.serverCloseDecorators = ImmutableList.copyOf(builder.serverCloseDecorators.values());
+  }
+
+  /**
+   * Creates a new {@link TracingServerInterceptor.Builder}.
+   *
+   * @return the tracing server interceptor builder
+   */
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
@@ -111,9 +97,7 @@ public class TracingServerInterceptor implements ServerInterceptor {
 
   @Override
   public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
-      ServerCall<ReqT, RespT> call,
-      Metadata headers,
-      ServerCallHandler<ReqT, RespT> next) {
+      ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
     final Set<String> headerKeys = headers.keys();
     Map<String, String> headerMap = new HashMap<>(headerKeys.size());
@@ -124,8 +108,9 @@ public class TracingServerInterceptor implements ServerInterceptor {
       }
     }
 
-    final Span span = getSpanFromHeaders(headerMap,
-        operationNameConstructor.constructOperationName(call.getMethodDescriptor()));
+    final Span span =
+        getSpanFromHeaders(
+            headerMap, operationNameConstructor.constructOperationName(call.getMethodDescriptor()));
 
     try (Scope ignored = tracer.scopeManager().activate(span)) {
 
@@ -153,57 +138,61 @@ public class TracingServerInterceptor implements ServerInterceptor {
         }
       }
 
-      Context ctxWithSpan = Context.current()
-          .withValue(OpenTracingContextKey.getKey(), span)
-          .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
+      Context ctxWithSpan =
+          Context.current()
+              .withValue(OpenTracingContextKey.getKey(), span)
+              .withValue(OpenTracingContextKey.getSpanContextKey(), span.context());
 
-      final ServerCall<ReqT, RespT> decoratedCall = new ForwardingServerCall
-          .SimpleForwardingServerCall<ReqT, RespT>(call) {
+      final ServerCall<ReqT, RespT> decoratedCall =
+          new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
 
-        @Override
-        public void sendHeaders(Metadata headers) {
-          if (verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_SEND_HEADERS)
-                .put(Fields.MESSAGE, "Server sent response headers")
-                .put(GrpcFields.HEADERS, headers.toString())
-                .build());
-          }
-          super.sendHeaders(headers);
-        }
-
-        @Override
-        public void sendMessage(RespT message) {
-          if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_SEND_MESSAGE)
-                .put(Fields.MESSAGE, "Server sent response message")
-                .build());
-          }
-          super.sendMessage(message);
-        }
-
-        @Override
-        public void close(Status status, Metadata trailers) {
-          if (verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_CLOSE)
-                .put(Fields.MESSAGE, "Server call closed")
-                .build());
-            if (!status.isOk()) {
-              GrpcFields.logServerCallError(span, status.getDescription(), status.getCause());
+            @Override
+            public void sendHeaders(Metadata headers) {
+              if (verbose) {
+                span.log(
+                    ImmutableMap.<String, Object>builder()
+                        .put(Fields.EVENT, GrpcFields.SERVER_CALL_SEND_HEADERS)
+                        .put(Fields.MESSAGE, "Server sent response headers")
+                        .put(GrpcFields.HEADERS, headers.toString())
+                        .build());
+              }
+              super.sendHeaders(headers);
             }
-          }
-          GrpcTags.GRPC_STATUS.set(span, status);
-          for (ServerCloseDecorator serverCloseDecorator : serverCloseDecorators) {
-            serverCloseDecorator.close(span, status, trailers);
-          }
-          super.close(status, trailers);
-        }
-      };
 
-      ServerCall.Listener<ReqT> listenerWithContext = Contexts
-          .interceptCall(ctxWithSpan, decoratedCall, headers, next);
+            @Override
+            public void sendMessage(RespT message) {
+              if (streaming || verbose) {
+                span.log(
+                    ImmutableMap.<String, Object>builder()
+                        .put(Fields.EVENT, GrpcFields.SERVER_CALL_SEND_MESSAGE)
+                        .put(Fields.MESSAGE, "Server sent response message")
+                        .build());
+              }
+              super.sendMessage(message);
+            }
+
+            @Override
+            public void close(Status status, Metadata trailers) {
+              if (verbose) {
+                span.log(
+                    ImmutableMap.<String, Object>builder()
+                        .put(Fields.EVENT, GrpcFields.SERVER_CALL_CLOSE)
+                        .put(Fields.MESSAGE, "Server call closed")
+                        .build());
+                if (!status.isOk()) {
+                  GrpcFields.logServerCallError(span, status.getDescription(), status.getCause());
+                }
+              }
+              GrpcTags.GRPC_STATUS.set(span, status);
+              for (ServerCloseDecorator serverCloseDecorator : serverCloseDecorators) {
+                serverCloseDecorator.close(span, status, trailers);
+              }
+              super.close(status, trailers);
+            }
+          };
+
+      ServerCall.Listener<ReqT> listenerWithContext =
+          Contexts.interceptCall(ctxWithSpan, decoratedCall, headers, next);
 
       return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
           listenerWithContext) {
@@ -218,10 +207,11 @@ public class TracingServerInterceptor implements ServerInterceptor {
         @Override
         public void onMessage(ReqT message) {
           if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE)
-                .put(Fields.MESSAGE, "Server received message")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_MESSAGE)
+                    .put(Fields.MESSAGE, "Server received message")
+                    .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             super.onMessage(message);
@@ -231,24 +221,25 @@ public class TracingServerInterceptor implements ServerInterceptor {
         @Override
         public void onHalfClose() {
           if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE)
-                .put(Fields.MESSAGE, "Server received all messages")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_HALF_CLOSE)
+                    .put(Fields.MESSAGE, "Server received all messages")
+                    .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             super.onHalfClose();
           }
-
         }
 
         @Override
         public void onCancel() {
           if (verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_CANCEL)
-                .put(Fields.MESSAGE, "Server call cancelled")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_CANCEL)
+                    .put(Fields.MESSAGE, "Server call cancelled")
+                    .build());
           }
           GrpcTags.GRPC_STATUS.set(span, Status.CANCELLED);
           try (Scope ignored = tracer.scopeManager().activate(span)) {
@@ -261,10 +252,11 @@ public class TracingServerInterceptor implements ServerInterceptor {
         @Override
         public void onComplete() {
           if (verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_COMPLETE)
-                .put(Fields.MESSAGE, "Server call completed")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.SERVER_CALL_LISTENER_ON_COMPLETE)
+                    .put(Fields.MESSAGE, "Server call completed")
+                    .build());
           }
           // Server span may complete with non-OK ServerCall.close(status).
           try (Scope ignored = tracer.scopeManager().activate(span)) {
@@ -282,34 +274,36 @@ public class TracingServerInterceptor implements ServerInterceptor {
     Map<String, Object> fields = null;
     Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName);
     try {
-      SpanContext parentSpanCtx = tracer
-          .extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
+      SpanContext parentSpanCtx =
+          tracer.extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(headers));
       if (parentSpanCtx != null) {
         spanBuilder = spanBuilder.asChildOf(parentSpanCtx);
       }
     } catch (IllegalArgumentException iae) {
       spanBuilder = spanBuilder.withTag(Tags.ERROR, Boolean.TRUE);
-      fields = ImmutableMap.<String, Object>builder()
-          .put(Fields.EVENT, GrpcFields.ERROR)
-          .put(Fields.ERROR_OBJECT, new RuntimeException("Parent span context extract failed", iae))
-          .build();
+      fields =
+          ImmutableMap.<String, Object>builder()
+              .put(Fields.EVENT, GrpcFields.ERROR)
+              .put(
+                  Fields.ERROR_OBJECT,
+                  new RuntimeException("Parent span context extract failed", iae))
+              .build();
     }
-    Span span = spanBuilder
-        .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
-        .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
-        .start();
+    Span span =
+        spanBuilder
+            .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+            .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
+            .start();
     if (fields != null) {
       span.log(fields);
     }
     return span;
   }
 
-  /**
-   * Builds the configuration of a TracingServerInterceptor.
-   */
+  /** Builds the configuration of a TracingServerInterceptor. */
   public static class Builder {
 
-    private final Tracer tracer;
+    private Tracer tracer;
     private OperationNameConstructor operationNameConstructor;
     private boolean streaming;
     private boolean verbose;
@@ -317,26 +311,26 @@ public class TracingServerInterceptor implements ServerInterceptor {
     private Map<Class<?>, ServerSpanDecorator> serverSpanDecorators;
     private Map<Class<?>, ServerCloseDecorator> serverCloseDecorators;
 
-    /**
-     * Creates a Builder using GlobalTracer to get tracer.
-     */
-    public Builder() {
-      this(GlobalTracer.get());
-    }
-
-    /**
-     * Creates a Builder with provided tracer.
-     *
-     * @param tracer to use for this interceptor Creates a Builder with default configuration
-     */
-    public Builder(Tracer tracer) {
-      this.tracer = tracer;
+    /** Creates a Builder with GlobalTracer if present else NoopTracer. */
+    private Builder() {
+      this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
       this.serverSpanDecorators = new HashMap<>();
       this.serverCloseDecorators = new HashMap<>();
+    }
+
+    /**
+     * Provide the {@link Tracer}.
+     *
+     * @param tracer the tracer
+     * @return this Builder with configured tracer
+     */
+    public Builder withTracer(Tracer tracer) {
+      this.tracer = tracer;
+      return this;
     }
 
     /**

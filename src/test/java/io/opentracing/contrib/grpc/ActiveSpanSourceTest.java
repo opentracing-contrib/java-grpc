@@ -51,13 +51,12 @@ public class ActiveSpanSourceTest {
     Context ctx = Context.current().withValue(OpenTracingContextKey.getKey(), span);
     Context previousCtx = ctx.attach();
 
-    assertEquals("active span should be OpenTracingContextKey.activeSpan()", ss.getActiveSpan(),
-        span);
+    assertEquals(
+        "active span should be OpenTracingContextKey.activeSpan()", ss.getActiveSpan(), span);
 
     ctx.detach(previousCtx);
     span.finish();
 
     assertNull("active span should be null, no span in OpenTracingContextKey", ss.getActiveSpan());
   }
-
 }

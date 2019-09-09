@@ -32,6 +32,7 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
+import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
@@ -46,9 +47,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
-/**
- * An interceptor that applies tracing via OpenTracing to all client requests.
- */
+/** An interceptor that applies tracing via OpenTracing to all client requests. */
 public class TracingClientInterceptor implements ClientInterceptor {
 
   private final Tracer tracer;
@@ -61,30 +60,6 @@ public class TracingClientInterceptor implements ClientInterceptor {
   private final ImmutableList<ClientSpanDecorator> clientSpanDecorators;
   private final ImmutableList<ClientCloseDecorator> clientCloseDecorators;
 
-  /**
-   * Instantiate interceptor using GlobalTracer to get tracer.
-   */
-  public TracingClientInterceptor() {
-    this(GlobalTracer.get());
-  }
-
-  /**
-   * Instantiate interceptor with provided tracer.
-   *
-   * @param tracer to use to trace requests.
-   */
-  public TracingClientInterceptor(Tracer tracer) {
-    this.tracer = tracer;
-    this.operationNameConstructor = OperationNameConstructor.DEFAULT;
-    this.streaming = false;
-    this.verbose = false;
-    this.tracedAttributes = new HashSet<>();
-    this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
-    this.activeSpanContextSource = null;
-    this.clientSpanDecorators = ImmutableList.of();
-    this.clientCloseDecorators = ImmutableList.of();
-  }
-
   private TracingClientInterceptor(Builder builder) {
     this.tracer = builder.tracer;
     this.operationNameConstructor = builder.operationNameConstructor;
@@ -95,7 +70,15 @@ public class TracingClientInterceptor implements ClientInterceptor {
     this.activeSpanContextSource = builder.activeSpanContextSource;
     this.clientSpanDecorators = ImmutableList.copyOf(builder.clientSpanDecorators.values());
     this.clientCloseDecorators = ImmutableList.copyOf(builder.clientCloseDecorators.values());
+  }
 
+  /**
+   * Creates a new {@link TracingClientInterceptor.Builder}.
+   *
+   * @return the tracing client interceptor builder
+   */
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
@@ -110,9 +93,7 @@ public class TracingClientInterceptor implements ClientInterceptor {
 
   @Override
   public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
-      MethodDescriptor<ReqT, RespT> method,
-      CallOptions callOptions,
-      Channel next) {
+      MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
 
     final String operationName = operationNameConstructor.constructOperationName(method);
 
@@ -131,8 +112,8 @@ public class TracingClientInterceptor implements ClientInterceptor {
             GrpcTags.GRPC_CALL_OPTIONS.set(span, callOptions);
             break;
           case AUTHORITY:
-            GrpcTags.GRPC_AUTHORITY.set(span,
-                MoreObjects.firstNonNull(callOptions.getAuthority(), next.authority()));
+            GrpcTags.GRPC_AUTHORITY.set(
+                span, MoreObjects.firstNonNull(callOptions.getAuthority(), next.authority()));
             break;
           case COMPRESSOR:
             GrpcTags.GRPC_COMPRESSOR.set(span, callOptions.getCompressor());
@@ -161,80 +142,89 @@ public class TracingClientInterceptor implements ClientInterceptor {
         @Override
         public void start(Listener<RespT> responseListener, final Metadata headers) {
           if (verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_START)
-                .put(Fields.MESSAGE, "Client call started")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_START)
+                    .put(Fields.MESSAGE, "Client call started")
+                    .build());
           }
           if (tracedAttributes.contains(ClientRequestAttribute.HEADERS)) {
             GrpcTags.GRPC_HEADERS.set(span, headers);
           }
 
-          tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new TextMap() {
-            @Override
-            public void put(String key, String value) {
-              Metadata.Key<String> headerKey =
-                  Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER);
-              headers.put(headerKey, value);
-            }
-
-            @Override
-            public Iterator<Entry<String, String>> iterator() {
-              throw new UnsupportedOperationException(
-                  "TextMapInjectAdapter should only be used with Tracer.inject()");
-            }
-          });
-
-          Listener<RespT> tracingResponseListener = new ForwardingClientCallListener
-              .SimpleForwardingClientCallListener<RespT>(responseListener) {
-
-            @Override
-            public void onHeaders(Metadata headers) {
-              if (verbose) {
-                span.log(ImmutableMap.<String, Object>builder()
-                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_HEADERS)
-                    .put(Fields.MESSAGE, "Client received response headers")
-                    .put(GrpcFields.HEADERS, headers.toString())
-                    .build());
-              }
-              super.onHeaders(headers);
-            }
-
-            @Override
-            public void onMessage(RespT message) {
-              if (streaming || verbose) {
-                span.log(ImmutableMap.<String, Object>builder()
-                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE)
-                    .put(Fields.MESSAGE, "Client received response message")
-                    .build());
-              }
-              super.onMessage(message);
-            }
-
-            @Override
-            public void onClose(Status status, Metadata trailers) {
-              if (!finished.compareAndSet(false, true)) {
-                super.onClose(status, trailers);
-                return;
-              }
-
-              if (verbose) {
-                span.log(ImmutableMap.<String, Object>builder()
-                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
-                    .put(Fields.MESSAGE, "Client call closed")
-                    .build());
-                if (!status.isOk()) {
-                  GrpcFields.logClientCallError(span, status.getDescription(), status.getCause());
+          tracer.inject(
+              span.context(),
+              Format.Builtin.HTTP_HEADERS,
+              new TextMap() {
+                @Override
+                public void put(String key, String value) {
+                  Metadata.Key<String> headerKey =
+                      Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER);
+                  headers.put(headerKey, value);
                 }
-              }
-              GrpcTags.GRPC_STATUS.set(span, status);
-              for (ClientCloseDecorator clientCloseDecorator : clientCloseDecorators) {
-                clientCloseDecorator.close(span, status, trailers);
-              }
-              super.onClose(status, trailers);
-              span.finish();
-            }
-          };
+
+                @Override
+                public Iterator<Entry<String, String>> iterator() {
+                  throw new UnsupportedOperationException(
+                      "TextMapInjectAdapter should only be used with Tracer.inject()");
+                }
+              });
+
+          Listener<RespT> tracingResponseListener =
+              new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(
+                  responseListener) {
+
+                @Override
+                public void onHeaders(Metadata headers) {
+                  if (verbose) {
+                    span.log(
+                        ImmutableMap.<String, Object>builder()
+                            .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_HEADERS)
+                            .put(Fields.MESSAGE, "Client received response headers")
+                            .put(GrpcFields.HEADERS, headers.toString())
+                            .build());
+                  }
+                  super.onHeaders(headers);
+                }
+
+                @Override
+                public void onMessage(RespT message) {
+                  if (streaming || verbose) {
+                    span.log(
+                        ImmutableMap.<String, Object>builder()
+                            .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_MESSAGE)
+                            .put(Fields.MESSAGE, "Client received response message")
+                            .build());
+                  }
+                  super.onMessage(message);
+                }
+
+                @Override
+                public void onClose(Status status, Metadata trailers) {
+                  if (!finished.compareAndSet(false, true)) {
+                    super.onClose(status, trailers);
+                    return;
+                  }
+
+                  if (verbose) {
+                    span.log(
+                        ImmutableMap.<String, Object>builder()
+                            .put(Fields.EVENT, GrpcFields.CLIENT_CALL_LISTENER_ON_CLOSE)
+                            .put(Fields.MESSAGE, "Client call closed")
+                            .build());
+                    if (!status.isOk()) {
+                      GrpcFields.logClientCallError(
+                          span, status.getDescription(), status.getCause());
+                    }
+                  }
+                  GrpcTags.GRPC_STATUS.set(span, status);
+                  for (ClientCloseDecorator clientCloseDecorator : clientCloseDecorators) {
+                    clientCloseDecorator.close(span, status, trailers);
+                  }
+                  super.onClose(status, trailers);
+                  span.finish();
+                }
+              };
 
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             super.start(tracingResponseListener, headers);
@@ -242,19 +232,13 @@ public class TracingClientInterceptor implements ClientInterceptor {
         }
 
         @Override
-        public void request(int numMessages) {
-          try (Scope ignored = tracer.scopeManager().activate(span)) {
-            super.request(numMessages);
-          }
-        }
-
-        @Override
         public void sendMessage(ReqT message) {
           if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
-                .put(Fields.MESSAGE, "Client sent message")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_SEND_MESSAGE)
+                    .put(Fields.MESSAGE, "Client sent message")
+                    .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             super.sendMessage(message);
@@ -264,10 +248,11 @@ public class TracingClientInterceptor implements ClientInterceptor {
         @Override
         public void halfClose() {
           if (streaming || verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_HALF_CLOSE)
-                .put(Fields.MESSAGE, "Client sent all messages")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_HALF_CLOSE)
+                    .put(Fields.MESSAGE, "Client sent all messages")
+                    .build());
           }
           try (Scope ignored = tracer.scopeManager().activate(span)) {
             super.halfClose();
@@ -282,10 +267,11 @@ public class TracingClientInterceptor implements ClientInterceptor {
           }
 
           if (verbose) {
-            span.log(ImmutableMap.<String, Object>builder()
-                .put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL)
-                .put(Fields.MESSAGE, "Client call canceled")
-                .build());
+            span.log(
+                ImmutableMap.<String, Object>builder()
+                    .put(Fields.EVENT, GrpcFields.CLIENT_CALL_CANCEL)
+                    .put(Fields.MESSAGE, "Client call canceled")
+                    .build());
             GrpcFields.logClientCallError(span, message, cause);
           }
           Status status = cause == null ? Status.UNKNOWN : Status.fromThrowable(cause);
@@ -332,12 +318,10 @@ public class TracingClientInterceptor implements ClientInterceptor {
         .start();
   }
 
-  /**
-   * Builds the configuration of a TracingClientInterceptor.
-   */
+  /** Builds the configuration of a TracingClientInterceptor. */
   public static class Builder {
 
-    private final Tracer tracer;
+    private Tracer tracer;
     private OperationNameConstructor operationNameConstructor;
     private boolean streaming;
     private boolean verbose;
@@ -347,27 +331,28 @@ public class TracingClientInterceptor implements ClientInterceptor {
     private Map<Class<?>, ClientSpanDecorator> clientSpanDecorators;
     private Map<Class<?>, ClientCloseDecorator> clientCloseDecorators;
 
-    /**
-     * Creates a Builder using GlobalTracer to get tracer.
-     */
+    /** Creates a Builder with GlobalTracer if present else NoopTracer. */
     public Builder() {
-      this(GlobalTracer.get());
-    }
-
-    /**
-     * Creates a Builder with provided tracer.
-     *
-     * @param tracer to use for this interceptor Creates a Builder with default configuration
-     */
-    public Builder(Tracer tracer) {
-      this.tracer = tracer;
+      this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
       this.tracedAttributes = new HashSet<>();
-      this.activeSpanSource = ActiveSpanSource.GRPC_CONTEXT;
+      this.activeSpanSource = ActiveSpanSource.NONE;
+      this.activeSpanContextSource = ActiveSpanContextSource.NONE;
       this.clientSpanDecorators = new HashMap<>();
       this.clientCloseDecorators = new HashMap<>();
+    }
+
+    /**
+     * Provide the {@link Tracer}.
+     *
+     * @param tracer the tracer
+     * @return this Builder with configured tracer
+     */
+    public Builder withTracer(Tracer tracer) {
+      this.tracer = tracer;
+      return this;
     }
 
     /**
@@ -416,9 +401,9 @@ public class TracingClientInterceptor implements ClientInterceptor {
      * Provide the active span source.
      *
      * @param activeSpanSource that provides a method of getting the active span before the client
-     *                         call
+     *     call
      * @return this Builder configured to start client span as children of the span returned by
-     * activeSpanSource.getActiveSpan()
+     *     activeSpanSource.getActiveSpan()
      */
     public Builder withActiveSpanSource(ActiveSpanSource activeSpanSource) {
       this.activeSpanSource = activeSpanSource;
@@ -429,9 +414,9 @@ public class TracingClientInterceptor implements ClientInterceptor {
      * Provide the active span context source.
      *
      * @param activeSpanContextSource that provides a method of getting the active span context
-     *                                before the client call
+     *     before the client call
      * @return this Builder configured to start client span as children of the span context returned
-     * by activeSpanContextSource.getActiveSpanContext()
+     *     by activeSpanContextSource.getActiveSpanContext()
      */
     public Builder withActiveSpanContextSource(ActiveSpanContextSource activeSpanContextSource) {
       this.activeSpanContextSource = activeSpanContextSource;

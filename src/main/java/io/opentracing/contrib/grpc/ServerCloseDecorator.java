@@ -30,8 +30,8 @@ public interface ServerCloseDecorator {
    * The method of the implementation is executed inside {@link ForwardingServerCall#close(Status,
    * Metadata)}.
    *
-   * @param span     The span created by {@link TracingServerInterceptor}
-   * @param status   The status passed to {@link ServerCall#close(Status, Metadata)}.
+   * @param span The span created by {@link TracingServerInterceptor}
+   * @param status The status passed to {@link ServerCall#close(Status, Metadata)}.
    * @param trailers The trailing headers passed to {@link ServerCall#close(Status, Metadata)}
    */
   void close(Span span, Status status, Metadata trailers);
