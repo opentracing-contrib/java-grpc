@@ -44,7 +44,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class ClientTracingInterceptorTest {
+public class TracingClientInterceptorTest {
 
   private static final String PREFIX = "testing-";
 
@@ -82,7 +82,7 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientBasic() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
@@ -104,7 +104,7 @@ public class ClientTracingInterceptorTest {
   @Test
   public void testTracedClientTwoInterceptors() {
     SecondClientInterceptor secondInterceptor = new SecondClientInterceptor(clientTracer);
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), secondInterceptor,
         tracingInterceptor);
 
@@ -126,7 +126,7 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithVerbosity() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withVerbosity()
         .build();
@@ -163,7 +163,7 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithStreaming() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withStreaming()
         .build();
@@ -196,7 +196,7 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithOperationName() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withOperationName(new OperationNameConstructor() {
           @Override
@@ -226,9 +226,9 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithTracedAttributes() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
-        .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
+        .withTracedAttributes(TracingClientInterceptor.ClientRequestAttribute.values())
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), 50, "gzip", tracingInterceptor);
 
@@ -260,7 +260,7 @@ public class ClientTracingInterceptorTest {
         return parentSpan;
       }
     };
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withActiveSpanSource(activeSpanSource)
         .build();
@@ -291,7 +291,7 @@ public class ClientTracingInterceptorTest {
         return parentSpan.context();
       }
     };
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withActiveSpanContextSource(activeSpanContextSource)
         .build();
@@ -330,7 +330,7 @@ public class ClientTracingInterceptorTest {
       }
     };
 
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withClientSpanDecorator(spanTagger)
         .withClientSpanDecorator(spanLogger)
@@ -372,7 +372,7 @@ public class ClientTracingInterceptorTest {
       }
     };
 
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withClientCloseDecorator(closeTagger)
         .withClientCloseDecorator(closeLogger)
