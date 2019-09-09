@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.grpc.ClientInterceptor;
@@ -32,14 +33,6 @@ class TracedClient {
   TracedClient(
       ManagedChannel channel,
       long deadline,
-      ClientInterceptor... interceptors) {
-    blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
-        .withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
-  }
-
-  TracedClient(
-      ManagedChannel channel,
-      long deadline,
       String compression,
       ClientInterceptor... interceptors) {
     blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel, interceptors))
@@ -47,9 +40,9 @@ class TracedClient {
         .withCompression(compression);
   }
 
-  HelloReply greet(String name) {
+  HelloReply greet() {
     try {
-      return blockingStub.sayHello(HelloRequest.newBuilder().setName(name).build());
+      return blockingStub.sayHello(HelloRequest.newBuilder().setName("world").build());
     } catch (Exception ignored) {
       return null;
     }

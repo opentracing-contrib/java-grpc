@@ -15,7 +15,6 @@
 package io.opentracing.contrib.grpc;
 
 import io.grpc.CallOptions;
-import io.grpc.Channel;
 import io.grpc.MethodDescriptor;
 import io.grpc.ServerCall;
 import io.opentracing.Span;
@@ -27,14 +26,14 @@ import io.opentracing.Span;
 public interface ClientSpanDecorator {
 
   /**
-   * The method of the implementation is executed inside {@link TracingClientInterceptor#interceptCall(MethodDescriptor,
-   * CallOptions, Channel)}.
+   * The method of the implementation is executed inside {@link
+   * TracingClientInterceptor#interceptCall}.
    *
    * @param span        The span created by {@link TracingClientInterceptor}
-   * @param callOptions The {@link ServerCall} parameter of {@link TracingClientInterceptor#interceptCall(MethodDescriptor,
-   *                    CallOptions, Channel)}
-   * @param method      The {@link MethodDescriptor} parameter of {@link TracingClientInterceptor#interceptCall(MethodDescriptor,
-   *                    CallOptions, Channel)}
+   * @param callOptions The {@link ServerCall} parameter of {@link
+   *                    TracingClientInterceptor#interceptCall}
+   * @param method      The {@link MethodDescriptor} parameter of {@link
+   *                    TracingClientInterceptor#interceptCall}
    */
   void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions);
 }

@@ -11,17 +11,18 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.opentracing.Span;
 
 /**
- * An interface that defines how to get the current active span
+ * An interface that defines how to get the current active span.
  */
 public interface ActiveSpanSource {
 
   /**
-   * ActiveSpanSource implementation that always returns null as the active span
+   * ActiveSpanSource implementation that always returns null as the active span.
    */
   ActiveSpanSource NONE = new ActiveSpanSource() {
     @Override
@@ -32,7 +33,7 @@ public interface ActiveSpanSource {
 
   /**
    * ActiveSpanSource implementation that returns the current span stored in the GRPC context under
-   * {@link OpenTracingContextKey}
+   * {@link OpenTracingContextKey}.
    */
   ActiveSpanSource GRPC_CONTEXT = new ActiveSpanSource() {
     @Override
@@ -42,6 +43,8 @@ public interface ActiveSpanSource {
   };
 
   /**
+   * Retieves the active {@link Span}.
+   *
    * @return the active span
    */
   Span getActiveSpan();

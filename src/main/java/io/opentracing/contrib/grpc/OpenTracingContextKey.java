@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.grpc.Context;
@@ -20,8 +21,8 @@ import io.opentracing.SpanContext;
 /**
  * A {@link io.grpc.Context} key for the current OpenTracing trace state.
  *
- * Can be used to get the active span, or to set the active span for a scoped unit of work. See the
- * <a href="../../../../../../README.rst">grpc-java OpenTracing docs</a> for use cases and
+ * <p>Can be used to get the active span, or to set the active span for a scoped unit of work. See
+ * the <a href="../../../../../../README.rst">grpc-java OpenTracing docs</a> for use cases and
  * examples.
  */
 public class OpenTracingContextKey {
@@ -32,6 +33,8 @@ public class OpenTracingContextKey {
   private static final Context.Key<SpanContext> keyContext = Context.key(KEY_CONTEXT_NAME);
 
   /**
+   * Retrieves the active span.
+   *
    * @return the active span for the current request
    */
   public static Span activeSpan() {
@@ -39,6 +42,8 @@ public class OpenTracingContextKey {
   }
 
   /**
+   * Retrieves the span key.
+   *
    * @return the OpenTracing context key
    */
   public static Context.Key<Span> getKey() {
@@ -46,6 +51,8 @@ public class OpenTracingContextKey {
   }
 
   /**
+   * Retrieves the span context key.
+   *
    * @return the OpenTracing context key for span context
    */
   public static Context.Key<SpanContext> getSpanContextKey() {

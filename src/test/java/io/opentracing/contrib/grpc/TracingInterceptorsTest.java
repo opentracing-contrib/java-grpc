@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.awaitility.Awaitility.await;
@@ -80,7 +81,7 @@ public class TracingInterceptorsTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -168,7 +169,7 @@ public class TracingInterceptorsTest {
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -246,7 +247,7 @@ public class TracingInterceptorsTest {
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -323,7 +324,7 @@ public class TracingInterceptorsTest {
     TracedService
         .addGeeterService(grpcServer.getServiceRegistry(), serverReceiveError, serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -402,7 +403,7 @@ public class TracingInterceptorsTest {
     TracedService
         .addGeeterService(grpcServer.getServiceRegistry(), serverSendError, serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 

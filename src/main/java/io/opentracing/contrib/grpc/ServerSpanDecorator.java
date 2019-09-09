@@ -16,7 +16,6 @@ package io.opentracing.contrib.grpc;
 
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
-import io.grpc.ServerCallHandler;
 import io.opentracing.Span;
 
 /**
@@ -26,14 +25,13 @@ import io.opentracing.Span;
 public interface ServerSpanDecorator {
 
   /**
-   * The method of the implementation is executed inside {@link TracingServerInterceptor#interceptCall(ServerCall,
-   * Metadata, ServerCallHandler)}.
+   * The method of the implementation is executed inside {@link
+   * TracingServerInterceptor#interceptCall}.
    *
    * @param span    The span created by {@link TracingServerInterceptor}
-   * @param call    The {@link ServerCall} parameter of {@link TracingServerInterceptor#interceptCall(ServerCall,
-   *                Metadata, ServerCallHandler)}
-   * @param headers The {@link Metadata} parameter of {@link TracingServerInterceptor#interceptCall(ServerCall,
-   *                Metadata, ServerCallHandler)}
+   * @param call    The {@link ServerCall} parameter of {@link
+   *                TracingServerInterceptor#interceptCall}
+   * @param headers The {@link Metadata} parameter of {@link TracingServerInterceptor#interceptCall}
    */
   void interceptCall(Span span, ServerCall call, Metadata headers);
 }

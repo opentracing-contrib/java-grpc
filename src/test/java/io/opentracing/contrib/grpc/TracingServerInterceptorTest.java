@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.awaitility.Awaitility.await;
@@ -95,7 +96,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -119,7 +120,7 @@ public class TracingServerInterceptorTest {
         grpcServer.getServiceRegistry(), secondServerInterceptor, tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -144,7 +145,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -181,7 +182,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -220,7 +221,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -245,7 +246,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -288,7 +289,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);
@@ -329,7 +330,7 @@ public class TracingServerInterceptorTest {
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         serverTracer.finishedSpans().size(), 1);

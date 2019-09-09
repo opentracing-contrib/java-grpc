@@ -22,14 +22,12 @@ import io.opentracing.Span;
 public interface ClientCloseDecorator {
 
   /**
-   * The method of the implementation is executed inside {@link ForwardingClientCallListener#onClose(Status,
-   * Metadata)}.
+   * The method of the implementation is executed inside {@link
+   * ForwardingClientCallListener#onClose}.
    *
    * @param span     The span created by {@link TracingClientInterceptor}
-   * @param status   The status passed to {@link ForwardingClientCallListener#onClose(Status,
-   *                 Metadata)}.
-   * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose(Status,
-   *                 Metadata)}.
+   * @param status   The status passed to {@link ForwardingClientCallListener#onClose}.
+   * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose}.
    */
   void close(Span span, Status status, Metadata trailers);
 }
