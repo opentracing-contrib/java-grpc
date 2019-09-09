@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.grpc.ForwardingClientCallListener;
@@ -19,15 +20,14 @@ import io.grpc.Status;
 import io.opentracing.Span;
 
 public interface ClientCloseDecorator {
+
   /**
-   * The method of the implementation is executed inside {@link ForwardingClientCallListener#onClose(Status,
-   * Metadata)}
+   * The method of the implementation is executed inside {@link
+   * ForwardingClientCallListener#onClose}.
    *
-   * @param span The span created by {@link ClientTracingInterceptor}
-   * @param status The status passed to {@link ForwardingClientCallListener#onClose(Status,
-   * Metadata)}.
-   * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose(Status,
-   * Metadata)}
+   * @param span     The span created by {@link TracingClientInterceptor}
+   * @param status   The status passed to {@link ForwardingClientCallListener#onClose}.
+   * @param trailers The trailing headers passed to {@link ForwardingClientCallListener#onClose}.
    */
   void close(Span span, Status status, Metadata trailers);
 }

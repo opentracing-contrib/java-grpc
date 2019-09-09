@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.grpc.MethodDescriptor;
@@ -34,8 +35,8 @@ public interface OperationNameConstructor {
   /**
    * Constructs a span's operation name from the RPC's method.
    *
-   * @param method the rpc method to extract a name from
-   * @param <ReqT> the rpc request type
+   * @param method  the rpc method to extract a name from
+   * @param <ReqT>  the rpc request type
    * @param <RespT> the rpc response type
    * @return the operation name
    */

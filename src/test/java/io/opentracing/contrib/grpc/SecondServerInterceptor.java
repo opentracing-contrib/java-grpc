@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertNotNull;
@@ -27,9 +28,10 @@ import io.grpc.Status;
 import io.opentracing.mock.MockTracer;
 
 public class SecondServerInterceptor implements ServerInterceptor {
+
   private final MockTracer tracer;
 
-  public SecondServerInterceptor(MockTracer tracer) {
+  SecondServerInterceptor(MockTracer tracer) {
     this.tracer = tracer;
   }
 
@@ -107,35 +109,35 @@ public class SecondServerInterceptor implements ServerInterceptor {
     return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
         next.startCall(call, headers)) {
 
-          @Override
-          public void onMessage(ReqT message) {
-            assertNotNull(tracer.activeSpan());
-            delegate().onMessage(message);
-          }
+      @Override
+      public void onMessage(ReqT message) {
+        assertNotNull(tracer.activeSpan());
+        delegate().onMessage(message);
+      }
 
-          @Override
-          public void onHalfClose() {
-            assertNotNull(tracer.activeSpan());
-            delegate().onHalfClose();
-          }
+      @Override
+      public void onHalfClose() {
+        assertNotNull(tracer.activeSpan());
+        delegate().onHalfClose();
+      }
 
-          @Override
-          public void onCancel() {
-            assertNotNull(tracer.activeSpan());
-            delegate().onCancel();
-          }
+      @Override
+      public void onCancel() {
+        assertNotNull(tracer.activeSpan());
+        delegate().onCancel();
+      }
 
-          @Override
-          public void onComplete() {
-            assertNotNull(tracer.activeSpan());
-            delegate().onComplete();
-          }
+      @Override
+      public void onComplete() {
+        assertNotNull(tracer.activeSpan());
+        delegate().onComplete();
+      }
 
-          @Override
-          public void onReady() {
-            assertNotNull(tracer.activeSpan());
-            delegate().onReady();
-          }
-        };
+      @Override
+      public void onReady() {
+        assertNotNull(tracer.activeSpan());
+        delegate().onReady();
+      }
+    };
   }
 }

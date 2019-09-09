@@ -20,7 +20,7 @@ pom.xml
 
 - Instantiate tracer
 - Optionally register tracer with GlobalTracer: `GlobalTracer.register(tracer)`
-- Create a `ServerTracingInterceptor`
+- Create a `TracingServerInterceptor`
 - Intercept a service
 
 ```java
@@ -33,10 +33,10 @@ import io.opentracing.Tracer;
         private final Tracer tracer;
 
         private void start() throws IOException {
-            ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor(this.tracer);
+            TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor(this.tracer);
             
             // If GlobalTracer is used: 
-            // ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor();
+            TracingServerInterceptor
 
             server = ServerBuilder.forPort(port)
                 .addService(tracingInterceptor.intercept(someServiceDef))
@@ -50,7 +50,7 @@ import io.opentracing.Tracer;
 
 - Instantiate a tracer
 - Optionally register tracer with GlobalTracer: `GlobalTracer.register(tracer)`
-- Create a `ClientTracingInterceptor`
+- Create a `TracingClientInterceptor`
 - Intercept the client channel
 
 ```java
@@ -68,10 +68,10 @@ import io.opentracing.Tracer;
                 .usePlaintext(true)
                 .build();
 
-            ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(this.tracer);
+            TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(this.tracer);
             
             // If GlobalTracer is used: 
-            // ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor();
+            TracingClientInterceptor
 
             blockingStub = GreeterGrpc.newBlockingStub(tracingInterceptor.intercept(channel));
         }
@@ -81,7 +81,7 @@ import io.opentracing.Tracer;
 
 ## Server Tracing
 
-A `ServerTracingInterceptor` uses default settings, which you can override by creating it using a `ServerTracingInterceptor.Builder`.
+A `TracingServerInterceptor` uses default settings, which you can override by creating it using a `TracingServerInterceptor.Builder`.
 
 - `withOperationName(OperationNameConstructor constructor)`: Define how the operation name is constructed for all spans created for the intercepted service. Default sets the operation name as the name of the RPC method. More details in the `Operation Name` section.
 - `withStreaming()`: Logs to the server span whenever a message is received. *Note:* This package supports streaming but has not been rigorously tested. If you come across any issues, please let us know.
@@ -91,7 +91,7 @@ A `ServerTracingInterceptor` uses default settings, which you can override by cr
 ### Example
 
 ```java
-    ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor
+    TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
         .Builder(tracer)
         .withStreaming()
         .withVerbosity()
@@ -108,7 +108,7 @@ A `ServerTracingInterceptor` uses default settings, which you can override by cr
 
 ## Client Tracing
 
-A `ClientTracingInterceptor` also has default settings, which you can override by creating it using a `ClientTracingInterceptor.Builder`.
+A `TracingClientInterceptor` also has default settings, which you can override by creating it using a `TracingClientInterceptor.Builder`.
 
 - `withOperationName(String operationName)`: Define how the operation name is constructed for all spans created for this intercepted client. Default is the name of the RPC method. More details in the `Operation Name` section.
 - `withActiveSpanSource(ActiveSpanSource activeSpanSource)`: Define how to extract the current active span, if any. This is needed if you want your client to continue a trace instead of starting a new one. More details in the `Active Span Sources` section.
@@ -121,7 +121,7 @@ A `ClientTracingInterceptor` also has default settings, which you can override b
 ```java
 import io.opentracing.Span;
 
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(tracer)
         .withStreaming()
         .withVerbosity()
@@ -199,10 +199,10 @@ Tracer tracer = ...;
 
 The default operation name for any span is the RPC method name (`io.grpc.MethodDescriptor.getFullMethodName()`). However, you may want to add your own prefixes, alter the name, or define a new name. For examples of good operation names, check out the OpenTracing `semantics`.
 
-To alter the operation name, you need to add an implementation of the interface `OperationNameConstructor` to the `ClientTracingInterceptor.Builder` or `ServerTracingInterceptor.Builder`. For example, if you want to add a prefix to the default operation name of your ClientInterceptor, your code would look like this:
+To alter the operation name, you need to add an implementation of the interface `OperationNameConstructor` to the `TracingClientInterceptor.Builder` or `TracingServerInterceptor.Builder`. For example, if you want to add a prefix to the default operation name of your ClientInterceptor, your code would look like this:
 
 ```java
- ClientTracingInterceptor interceptor = ClientTracingInterceptor.Builder ...
+ TracingClientInterceptor interceptor = TracingClientInterceptor.Builder ...
         .withOperationName(new OperationNameConstructor() {
             @Override
             public <ReqT, RespT> String constructOperationName(MethodDescriptor<ReqT, RespT> method) {
@@ -215,14 +215,14 @@ To alter the operation name, you need to add an implementation of the interface 
 
 ## Active Span Sources
 
-If you want your client to continue a trace rather than starting a new one, then you can tell your `ClientTracingInterceptor` how to extract the current active span by building it with your own implementation of the interface `ActiveSpanSource`. This interface has one method, `getActiveSpan`, in which you will define how to access the current active span.
+If you want your client to continue a trace rather than starting a new one, then you can tell your `TracingClientInterceptor` how to extract the current active span by building it with your own implementation of the interface `ActiveSpanSource`. This interface has one method, `getActiveSpan`, in which you will define how to access the current active span.
 
 For example, if you're creating the client in an environment that has the active span stored in a global dictionary-style context under `OPENTRACING_SPAN_KEY`, then you could configure your Interceptor as follows:
 
 ```java
 import io.opentracing.Span;
 
-    ClientTracingInterceptor interceptor = new ClientTracingInterceptor
+    TracingClientInterceptor interceptor = new TracingClientInterceptor
         .Builder(tracer)
         ...
         .withActiveSpanSource(new ActiveSpanSource() {
@@ -247,7 +247,7 @@ Instead of `ActiveSpanSource` it's possible to use `ActiveSpanContextSource` if 
 ```java
 import io.opentracing.Span;
 
-    ClientTracingInterceptor interceptor = new ClientTracingInterceptor
+    TracingClientInterceptor interceptor = new TracingClientInterceptor
         .Builder(tracer)
         ...
         .withActiveSpanContextSource(new ActiveSpanContextSource() {
@@ -272,7 +272,7 @@ If you want to add custom tags or logs to the server and client spans, then you 
 Multiple different decorators may be added to the builder.
 
 ```java
-ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor
+TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
     .Builder(tracer)
     ...
     .withClientSpanDecorator(new ClientSpanDecorator() {
@@ -291,7 +291,7 @@ ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor
     ...
     .build();
     
-ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor
+TracingServerInterceptor serverInterceptor = new TracingServerInterceptor
     .Builder(tracer)
     ...
     .withServerSpanDecorator(new ServerSpanDecorator() {
@@ -312,13 +312,13 @@ ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor
 ```
 
 ## Integrating with Other Interceptors
-Although we provide `ServerTracingInterceptor.intercept(service)` and `ClientTracingInterceptor.intercept(channel)` methods, you don't want to use these if you're chaining multiple interceptors. Instead, use the following code (preferably putting the tracing interceptor at the top of the interceptor stack so that it traces the entire request lifecycle, including other interceptors):
+Although we provide `TracingServerInterceptor.intercept(service)` and `TracingClientInterceptor.intercept(channel)` methods, you don't want to use these if you're chaining multiple interceptors. Instead, use the following code (preferably putting the tracing interceptor at the top of the interceptor stack so that it traces the entire request lifecycle, including other interceptors):
 
 ### Server
 ```java
 server = ServerBuilder.forPort(port)
         .addService(ServerInterceptors.intercept(service, someInterceptor,
-            someOtherInterceptor, serverTracingInterceptor))
+            someOtherInterceptor, TracingServerInterceptor))
         .build()
         .start();
 ```
@@ -326,7 +326,7 @@ server = ServerBuilder.forPort(port)
 ### Client
 ```java
 blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel,
-        someInterceptor, someOtherInterceptor, clientTracingInterceptor));
+        someInterceptor, someOtherInterceptor, TracingClientInterceptor));
 ```
 
 ## License

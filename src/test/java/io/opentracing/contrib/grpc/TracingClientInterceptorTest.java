@@ -44,7 +44,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class ClientTracingInterceptorTest {
+public class TracingClientInterceptorTest {
 
   private static final String PREFIX = "testing-";
 
@@ -74,7 +74,7 @@ public class ClientTracingInterceptorTest {
   public GrpcServerRule grpcServer = new GrpcServerRule();
 
   @Before
-  public void before() {
+  public void setUp() {
     GlobalTracerTestUtil.resetGlobalTracer();
     clientTracer.reset();
     TracedService.addGeeterService(grpcServer.getServiceRegistry());
@@ -82,11 +82,11 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientBasic() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -104,12 +104,12 @@ public class ClientTracingInterceptorTest {
   @Test
   public void testTracedClientTwoInterceptors() {
     SecondClientInterceptor secondInterceptor = new SecondClientInterceptor(clientTracer);
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor(clientTracer);
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(clientTracer);
     TracedClient client = new TracedClient(grpcServer.getChannel(), secondInterceptor,
         tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -126,14 +126,14 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithVerbosity() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withVerbosity()
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -163,14 +163,14 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithStreaming() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withStreaming()
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -196,7 +196,7 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithOperationName() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withOperationName(new OperationNameConstructor() {
           @Override
@@ -208,7 +208,7 @@ public class ClientTracingInterceptorTest {
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -226,14 +226,14 @@ public class ClientTracingInterceptorTest {
 
   @Test
   public void testTracedClientWithTracedAttributes() {
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
-        .withTracedAttributes(ClientTracingInterceptor.ClientRequestAttribute.values())
+        .withTracedAttributes(TracingClientInterceptor.ClientRequestAttribute.values())
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), 50, "gzip", tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -260,14 +260,14 @@ public class ClientTracingInterceptorTest {
         return parentSpan;
       }
     };
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withActiveSpanSource(activeSpanSource)
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -291,14 +291,14 @@ public class ClientTracingInterceptorTest {
         return parentSpan.context();
       }
     };
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withActiveSpanContextSource(activeSpanContextSource)
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -330,7 +330,7 @@ public class ClientTracingInterceptorTest {
       }
     };
 
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withClientSpanDecorator(spanTagger)
         .withClientSpanDecorator(spanLogger)
@@ -338,7 +338,7 @@ public class ClientTracingInterceptorTest {
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);
@@ -372,7 +372,7 @@ public class ClientTracingInterceptorTest {
       }
     };
 
-    ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor
+    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
         .Builder(clientTracer)
         .withClientCloseDecorator(closeTagger)
         .withClientCloseDecorator(closeLogger)
@@ -380,7 +380,7 @@ public class ClientTracingInterceptorTest {
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     assertEquals("one span should have been created and finished for one client request",
         clientTracer.finishedSpans().size(), 1);

@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.grpc.Attributes;
@@ -42,7 +43,8 @@ final class GrpcTags {
   /**
    * grpc.call_attributes tag.
    */
-  static final NullableTag<Attributes> GRPC_CALL_ATTRIBUTES = new NullableTag<>("grpc.call_attributes");
+  static final NullableTag<Attributes> GRPC_CALL_ATTRIBUTES = new NullableTag<>(
+      "grpc.call_attributes");
 
   /**
    * grpc.call_options tag.
@@ -74,7 +76,8 @@ final class GrpcTags {
   /**
    * grpc.method_name tag.
    */
-  static final Tag<MethodDescriptor> GRPC_METHOD_NAME = new AbstractTag<MethodDescriptor>("grpc.method_name") {
+  static final Tag<MethodDescriptor> GRPC_METHOD_NAME = new AbstractTag<MethodDescriptor>(
+      "grpc.method_name") {
     @Override
     public void set(Span span, MethodDescriptor method) {
       if (method != null) {
@@ -86,7 +89,8 @@ final class GrpcTags {
   /**
    * grpc.method_type tag.
    */
-  static final Tag<MethodDescriptor> GRPC_METHOD_TYPE = new AbstractTag<MethodDescriptor>("grpc.method_type") {
+  static final Tag<MethodDescriptor> GRPC_METHOD_TYPE = new AbstractTag<MethodDescriptor>(
+      "grpc.method_type") {
     @Override
     public void set(Span span, MethodDescriptor method) {
       if (method != null) {

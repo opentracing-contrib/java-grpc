@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertEquals;
@@ -96,17 +97,14 @@ public class OpenTracingContextKeyTest {
     Span childSpan = tracer.buildSpan("s1").start();
     Context childCtx = Context.current().withValue(OpenTracingContextKey.getKey(), childSpan);
     parentCtx = childCtx.attach();
-
     assertEquals(OpenTracingContextKey.activeSpan(), childSpan);
 
     childCtx.detach(parentCtx);
     childSpan.finish();
-
     assertEquals(OpenTracingContextKey.activeSpan(), parentSpan);
 
     parentCtx.detach(previousCtx);
     parentSpan.finish();
-
     assertNull(OpenTracingContextKey.activeSpan());
   }
 
@@ -121,17 +119,14 @@ public class OpenTracingContextKeyTest {
     Context childCtx = Context.current().withValue(OpenTracingContextKey.getSpanContextKey(),
         childSpan.context());
     parentCtx = childCtx.attach();
-
     assertEquals(OpenTracingContextKey.activeSpanContext(), childSpan.context());
 
     childCtx.detach(parentCtx);
     childSpan.finish();
-
     assertEquals(OpenTracingContextKey.activeSpanContext(), parentSpan.context());
 
     parentCtx.detach(previousCtx);
     parentSpan.finish();
-
     assertNull(OpenTracingContextKey.activeSpanContext());
   }
 }

@@ -49,7 +49,7 @@ import javax.annotation.Nullable;
 /**
  * An interceptor that applies tracing via OpenTracing to all client requests.
  */
-public class ClientTracingInterceptor implements ClientInterceptor {
+public class TracingClientInterceptor implements ClientInterceptor {
 
   private final Tracer tracer;
   private final OperationNameConstructor operationNameConstructor;
@@ -64,7 +64,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   /**
    * Instantiate interceptor using GlobalTracer to get tracer.
    */
-  public ClientTracingInterceptor() {
+  public TracingClientInterceptor() {
     this(GlobalTracer.get());
   }
 
@@ -73,7 +73,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
    *
    * @param tracer to use to trace requests.
    */
-  public ClientTracingInterceptor(Tracer tracer) {
+  public TracingClientInterceptor(Tracer tracer) {
     this.tracer = tracer;
     this.operationNameConstructor = OperationNameConstructor.DEFAULT;
     this.streaming = false;
@@ -85,7 +85,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     this.clientCloseDecorators = ImmutableList.of();
   }
 
-  private ClientTracingInterceptor(Builder builder) {
+  private TracingClientInterceptor(Builder builder) {
     this.tracer = builder.tracer;
     this.operationNameConstructor = builder.operationNameConstructor;
     this.streaming = builder.streaming;
@@ -333,7 +333,7 @@ public class ClientTracingInterceptor implements ClientInterceptor {
   }
 
   /**
-   * Builds the configuration of a ClientTracingInterceptor.
+   * Builds the configuration of a TracingClientInterceptor.
    */
   public static class Builder {
 
@@ -461,12 +461,12 @@ public class ClientTracingInterceptor implements ClientInterceptor {
     }
 
     /**
-     * Build the ClientTracingInterceptor.
+     * Build the TracingClientInterceptor.
      *
-     * @return a ClientTracingInterceptor with this Builder's configuration
+     * @return a TracingClientInterceptor with this Builder's configuration
      */
-    public ClientTracingInterceptor build() {
-      return new ClientTracingInterceptor(this);
+    public TracingClientInterceptor build() {
+      return new TracingClientInterceptor(this);
     }
   }
 

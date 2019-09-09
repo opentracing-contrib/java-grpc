@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertNotNull;
@@ -29,71 +30,72 @@ import javax.annotation.Nullable;
 
 public class SecondClientInterceptor implements ClientInterceptor {
 
-    private final MockTracer tracer;
+  private final MockTracer tracer;
 
-    public SecondClientInterceptor(MockTracer tracer) {
-        this.tracer = tracer;
-    }
+  SecondClientInterceptor(MockTracer tracer) {
+    this.tracer = tracer;
+  }
 
-    @Override
-    public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
-        MethodDescriptor<ReqT, RespT> method,
-        CallOptions callOptions,
-        Channel next) {
+  @Override
+  public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
+      MethodDescriptor<ReqT, RespT> method,
+      CallOptions callOptions,
+      Channel next) {
 
+    assertNotNull(tracer.activeSpan());
+
+    return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
+        next.newCall(method, callOptions)) {
+
+      @Override
+      public void start(Listener<RespT> responseListener, Metadata headers) {
         assertNotNull(tracer.activeSpan());
+        delegate().start(new ForwardingClientCallListener
+            .SimpleForwardingClientCallListener<RespT>(responseListener) {
+        }, headers);
+      }
 
-        return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
-            next.newCall(method, callOptions)) {
+      @Override
+      public void request(int numMessages) {
+        assertNotNull(tracer.activeSpan());
+        delegate().request(numMessages);
+      }
 
-            @Override
-            public void start(Listener<RespT> responseListener, Metadata headers) {
-                assertNotNull(tracer.activeSpan());
-                delegate().start(new ForwardingClientCallListener
-                    .SimpleForwardingClientCallListener<RespT>(responseListener) {}, headers);
-            }
+      @Override
+      public void cancel(@Nullable String message, @Nullable Throwable cause) {
+        assertNotNull(tracer.activeSpan());
+        delegate().cancel(message, cause);
+      }
 
-            @Override
-            public void request(int numMessages) {
-                assertNotNull(tracer.activeSpan());
-                delegate().request(numMessages);
-            }
+      @Override
+      public void halfClose() {
+        assertNotNull(tracer.activeSpan());
+        delegate().halfClose();
+      }
 
-            @Override
-            public void cancel(@Nullable String message, @Nullable Throwable cause) {
-                assertNotNull(tracer.activeSpan());
-                delegate().cancel(message, cause);
-            }
+      @Override
+      public void sendMessage(ReqT message) {
+        assertNotNull(tracer.activeSpan());
+        delegate().sendMessage(message);
+      }
 
-            @Override
-            public void halfClose() {
-                assertNotNull(tracer.activeSpan());
-                delegate().halfClose();
-            }
+      @Override
+      public boolean isReady() {
+        assertNotNull(tracer.activeSpan());
+        return delegate().isReady();
+      }
 
-            @Override
-            public void sendMessage(ReqT message) {
-                assertNotNull(tracer.activeSpan());
-                delegate().sendMessage(message);
-            }
+      @Override
+      public void setMessageCompression(boolean enabled) {
+        assertNotNull(tracer.activeSpan());
+        delegate().setMessageCompression(enabled);
+      }
 
-            @Override
-            public boolean isReady() {
-                assertNotNull(tracer.activeSpan());
-                return delegate().isReady();
-            }
-
-            @Override
-            public void setMessageCompression(boolean enabled) {
-                assertNotNull(tracer.activeSpan());
-                delegate().setMessageCompression(enabled);
-            }
-
-            @Override
-            public Attributes getAttributes() {
-                assertNotNull(tracer.activeSpan());
-                return delegate().getAttributes();
-            }
-        };
-    }
+      @Override
+      public Attributes getAttributes() {
+        assertNotNull(tracer.activeSpan());
+        return delegate().getAttributes();
+      }
+    };
+  }
 }

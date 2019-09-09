@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import io.grpc.ForwardingServerCall;
@@ -20,16 +21,17 @@ import io.grpc.Status;
 import io.opentracing.Span;
 
 /**
- * An interface for adding custom span tags to the spans created by {@link ServerTracingInterceptor}
+ * An interface for adding custom span tags to the spans created by {@link TracingServerInterceptor}
  * when the gRPC call is closed.
  */
 public interface ServerCloseDecorator {
+
   /**
    * The method of the implementation is executed inside {@link ForwardingServerCall#close(Status,
-   * Metadata)}
+   * Metadata)}.
    *
-   * @param span The span created by {@link ServerTracingInterceptor}
-   * @param status The status passed to {@link ServerCall#close(Status, Metadata)}.
+   * @param span     The span created by {@link TracingServerInterceptor}
+   * @param status   The status passed to {@link ServerCall#close(Status, Metadata)}.
    * @param trailers The trailing headers passed to {@link ServerCall#close(Status, Metadata)}
    */
   void close(Span span, Status status, Metadata trailers);

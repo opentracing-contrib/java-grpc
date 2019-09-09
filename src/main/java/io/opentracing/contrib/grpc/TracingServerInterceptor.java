@@ -47,7 +47,7 @@ import java.util.Set;
 /**
  * An interceptor that applies tracing via OpenTracing to all requests to the server.
  */
-public class ServerTracingInterceptor implements ServerInterceptor {
+public class TracingServerInterceptor implements ServerInterceptor {
 
   private final Tracer tracer;
   private final OperationNameConstructor operationNameConstructor;
@@ -60,7 +60,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   /**
    * Instantiate interceptor using GlobalTracer to get tracer.
    */
-  public ServerTracingInterceptor() {
+  public TracingServerInterceptor() {
     this(GlobalTracer.get());
   }
 
@@ -69,7 +69,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
    *
    * @param tracer used to trace requests
    */
-  public ServerTracingInterceptor(Tracer tracer) {
+  public TracingServerInterceptor(Tracer tracer) {
     this.tracer = tracer;
     this.operationNameConstructor = OperationNameConstructor.DEFAULT;
     this.streaming = false;
@@ -79,7 +79,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     this.serverCloseDecorators = ImmutableList.of();
   }
 
-  private ServerTracingInterceptor(Builder builder) {
+  private TracingServerInterceptor(Builder builder) {
     this.tracer = builder.tracer;
     this.operationNameConstructor = builder.operationNameConstructor;
     this.streaming = builder.streaming;
@@ -305,7 +305,7 @@ public class ServerTracingInterceptor implements ServerInterceptor {
   }
 
   /**
-   * Builds the configuration of a ServerTracingInterceptor.
+   * Builds the configuration of a TracingServerInterceptor.
    */
   public static class Builder {
 
@@ -404,12 +404,12 @@ public class ServerTracingInterceptor implements ServerInterceptor {
     }
 
     /**
-     * Build the ServerTracingInterceptor.
+     * Build the TracingServerInterceptor.
      *
-     * @return a ServerTracingInterceptor with this Builder's configuration
+     * @return a TracingServerInterceptor with this Builder's configuration
      */
-    public ServerTracingInterceptor build() {
-      return new ServerTracingInterceptor(this);
+    public TracingServerInterceptor build() {
+      return new TracingServerInterceptor(this);
     }
   }
 

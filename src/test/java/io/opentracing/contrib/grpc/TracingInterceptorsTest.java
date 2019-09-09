@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.awaitility.Awaitility.await;
@@ -41,14 +42,14 @@ import io.opentracing.mock.MockTracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import io.opentracing.util.GlobalTracerTestUtil;
-import org.assertj.core.api.Assertions;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import org.assertj.core.api.Assertions;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
 public class TracingInterceptorsTest {
 
@@ -69,18 +70,18 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientAndServerSuccess() {
-    ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor.Builder(clientTracer)
+    TracingClientInterceptor clientInterceptor = new TracingClientInterceptor.Builder(clientTracer)
         .withVerbosity()
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
-    ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor.Builder(serverTracer)
+    TracingServerInterceptor serverInterceptor = new TracingServerInterceptor.Builder(serverTracer)
         .withVerbosity()
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
     assertEquals("call should complete successfully", "Hello world",
-        client.greet("world").getMessage());
+        client.greet().getMessage());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -142,7 +143,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientSendError() {
-    ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor.Builder(clientTracer)
+    TracingClientInterceptor clientInterceptor = new TracingClientInterceptor.Builder(clientTracer)
         .withVerbosity()
         .build();
     ClientInterceptor clientSendError = new ClientInterceptor() {
@@ -160,14 +161,15 @@ public class TracingInterceptorsTest {
         };
       }
     };
-    TracedClient client = new TracedClient(grpcServer.getChannel(), clientSendError, clientInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), clientSendError,
+        clientInterceptor);
 
-    ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor.Builder(serverTracer)
+    TracingServerInterceptor serverInterceptor = new TracingServerInterceptor.Builder(serverTracer)
         .withVerbosity()
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -212,7 +214,7 @@ public class TracingInterceptorsTest {
 
   @Test
   public void testTracedClientReceiveError() {
-    ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor.Builder(clientTracer)
+    TracingClientInterceptor clientInterceptor = new TracingClientInterceptor.Builder(clientTracer)
         .withVerbosity()
         .build();
     ClientInterceptor clientReceiveError = new ClientInterceptor() {
@@ -221,27 +223,31 @@ public class TracingInterceptorsTest {
           MethodDescriptor<ReqT, RespT> method,
           CallOptions callOptions,
           Channel next) {
-        return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(next.newCall(method, callOptions)) {
+        return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
+            next.newCall(method, callOptions)) {
           @Override
           public void start(Listener<RespT> responseListener, Metadata headers) {
-            delegate().start(new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(responseListener) {
-              @Override
-              public void onMessage(RespT message) {
-                throw new RuntimeException("client receive error");
-              }
-            }, headers);
+            delegate().start(
+                new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(
+                    responseListener) {
+                  @Override
+                  public void onMessage(RespT message) {
+                    throw new RuntimeException("client receive error");
+                  }
+                }, headers);
           }
         };
       }
     };
-    TracedClient client = new TracedClient(grpcServer.getChannel(), clientReceiveError, clientInterceptor);
+    TracedClient client = new TracedClient(grpcServer.getChannel(), clientReceiveError,
+        clientInterceptor);
 
-    ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor.Builder(serverTracer)
+    TracingServerInterceptor serverInterceptor = new TracingServerInterceptor.Builder(serverTracer)
         .withVerbosity()
         .build();
     TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -290,33 +296,35 @@ public class TracingInterceptorsTest {
         .containsEntry(GrpcTags.GRPC_STATUS.getKey(), Status.Code.OK.name());
   }
 
-   @Test
+  @Test
   public void testTracedServerReceiveError() {
-    ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor.Builder(clientTracer)
+    TracingClientInterceptor clientInterceptor = new TracingClientInterceptor.Builder(clientTracer)
         .withVerbosity()
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
-    ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor.Builder(serverTracer)
+    TracingServerInterceptor serverInterceptor = new TracingServerInterceptor.Builder(serverTracer)
         .withVerbosity()
         .build();
-     ServerInterceptor serverReceiveError = new ServerInterceptor() {
-       @Override
-       public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
-           ServerCall<ReqT, RespT> call,
-           Metadata headers,
-           ServerCallHandler<ReqT, RespT> next) {
-         return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(next.startCall(call, headers)) {
-           @Override
-           public void onMessage(ReqT message) {
-             throw new RuntimeException("server receive error");
-           }
-         };
-       }
-     };
-    TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverReceiveError, serverInterceptor);
+    ServerInterceptor serverReceiveError = new ServerInterceptor() {
+      @Override
+      public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+          ServerCall<ReqT, RespT> call,
+          Metadata headers,
+          ServerCallHandler<ReqT, RespT> next) {
+        return new ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(
+            next.startCall(call, headers)) {
+          @Override
+          public void onMessage(ReqT message) {
+            throw new RuntimeException("server receive error");
+          }
+        };
+      }
+    };
+    TracedService
+        .addGeeterService(grpcServer.getServiceRegistry(), serverReceiveError, serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 
@@ -364,17 +372,17 @@ public class TracingInterceptorsTest {
         .as("server span grpc.status tag should equal INTERNAL")
         .containsEntry(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
         .containsEntry(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME);
-        //.containsEntry(GrpcTags.GRPC_STATUS.getKey(), Status.Code.INTERNAL.name());
+    //.containsEntry(GrpcTags.GRPC_STATUS.getKey(), Status.Code.INTERNAL.name());
   }
 
   @Test
   public void testTracedServerSendError() {
-    ClientTracingInterceptor clientInterceptor = new ClientTracingInterceptor.Builder(clientTracer)
+    TracingClientInterceptor clientInterceptor = new TracingClientInterceptor.Builder(clientTracer)
         .withVerbosity()
         .build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), clientInterceptor);
 
-    ServerTracingInterceptor serverInterceptor = new ServerTracingInterceptor.Builder(serverTracer)
+    TracingServerInterceptor serverInterceptor = new TracingServerInterceptor.Builder(serverTracer)
         .withVerbosity()
         .build();
     ServerInterceptor serverSendError = new ServerInterceptor() {
@@ -383,17 +391,19 @@ public class TracingInterceptorsTest {
           ServerCall<ReqT, RespT> call,
           Metadata headers,
           ServerCallHandler<ReqT, RespT> next) {
-        return next.startCall(new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
-          @Override
-          public void sendMessage(RespT message) {
-            throw new RuntimeException("server send error");
-          }
-        }, headers);
+        return next
+            .startCall(new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
+              @Override
+              public void sendMessage(RespT message) {
+                throw new RuntimeException("server send error");
+              }
+            }, headers);
       }
     };
-    TracedService.addGeeterService(grpcServer.getServiceRegistry(), serverSendError, serverInterceptor);
+    TracedService
+        .addGeeterService(grpcServer.getServiceRegistry(), serverSendError, serverInterceptor);
 
-    assertNull("call should return null", client.greet("world"));
+    assertNull("call should return null", client.greet());
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(clientTracer), equalTo(1));
     await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
 

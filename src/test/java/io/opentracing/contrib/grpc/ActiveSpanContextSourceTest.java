@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.junit.Assert.assertEquals;
@@ -32,7 +33,7 @@ public class ActiveSpanContextSourceTest {
   }
 
   @Test
-  public void TestDefaultNone() {
+  public void testDefaultNone() {
     ActiveSpanContextSource ss = ActiveSpanContextSource.NONE;
     assertNull("active span context should always be null", ss.getActiveSpanContext());
 
@@ -47,7 +48,7 @@ public class ActiveSpanContextSourceTest {
   }
 
   @Test
-  public void TestDefaultGrpc() {
+  public void testDefaultGrpc() {
     ActiveSpanContextSource ss = ActiveSpanContextSource.GRPC_CONTEXT;
     assertNull("active span context should be null, no span context in OpenTracingContextKey",
         ss.getActiveSpanContext());

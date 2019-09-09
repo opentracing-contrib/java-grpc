@@ -11,6 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.opentracing.contrib.grpc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +29,7 @@ import org.assertj.core.data.MapEntry;
 import org.junit.Test;
 
 public class GrpcTagsTest {
+
   @Test
   public void testStatusOk() {
     final Status status = Status.OK;
@@ -43,9 +45,7 @@ public class GrpcTagsTest {
     MockSpan span = new MockTracer().buildSpan("").start();
     GrpcTags.GRPC_STATUS.set(span, status);
     assertThat(span.tags())
-        .containsOnly(
-            MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name())
-        );
+        .containsOnly(MapEntry.entry(GrpcTags.GRPC_STATUS.getKey(), status.getCode().name()));
   }
 
   @Test
