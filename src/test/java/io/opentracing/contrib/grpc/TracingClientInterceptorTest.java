@@ -133,7 +133,7 @@ public class TracingClientInterceptorTest {
   @Test
   public void testTracedClientWithVerbosity() {
     TracingClientInterceptor tracingInterceptor =
-        new TracingClientInterceptor.Builder().withTracer(clientTracer).withVerbosity().build();
+        TracingClientInterceptor.newBuilder().withTracer(clientTracer).withVerbosity().build();
     TracedClient client = new TracedClient(grpcServer.getChannel(), tracingInterceptor);
 
     assertEquals("call should complete successfully", "Hello world", client.greet().getMessage());

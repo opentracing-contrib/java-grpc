@@ -332,7 +332,7 @@ public class TracingClientInterceptor implements ClientInterceptor {
     private Map<Class<?>, ClientCloseDecorator> clientCloseDecorators;
 
     /** Creates a Builder with GlobalTracer if present else NoopTracer. */
-    public Builder() {
+    private Builder() {
       this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
