@@ -33,7 +33,9 @@ import io.opentracing.Tracer;
         private final Tracer tracer;
 
         private void start() throws IOException {
-            TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor(this.tracer);
+            TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
+                .Builder(this.tracer)
+                .build();
             
             // If GlobalTracer is used: 
             TracingServerInterceptor
@@ -54,7 +56,7 @@ import io.opentracing.Tracer;
 - Intercept the client channel
 
 ```java
-import io.opentracing.Tracer;
+import io.opentracing.Tracer;import io.opentracing.contrib.grpc.TracingClientInterceptor;
 
     public class YourClient {
 
@@ -68,7 +70,9 @@ import io.opentracing.Tracer;
                 .usePlaintext(true)
                 .build();
 
-            TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor(this.tracer);
+            TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
+                .Builder(this.tracer)
+                .build();
             
             // If GlobalTracer is used: 
             TracingClientInterceptor
