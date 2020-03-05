@@ -347,4 +347,3 @@ blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel,
 [cov]: https://coveralls.io/github/opentracing-contrib/java-grpc?branch=master
 [maven-img]: https://img.shields.io/maven-central/v/io.opentracing.contrib/opentracing-grpc.svg
 [maven]: http://search.maven.org/#search%7Cga%7C1%7Copentracing-grpc
-
