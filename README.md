@@ -98,7 +98,7 @@ A `TracingServerInterceptor` uses default settings, which you can override by cr
 
 ```java
     TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
-        .Builder
+        .newBuilder()
         .withTracer(tracer)
         .withStreaming()
         .withVerbosity()
@@ -347,3 +347,4 @@ blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel,
 [cov]: https://coveralls.io/github/opentracing-contrib/java-grpc?branch=master
 [maven-img]: https://img.shields.io/maven-central/v/io.opentracing.contrib/opentracing-grpc.svg
 [maven]: http://search.maven.org/#search%7Cga%7C1%7Copentracing-grpc
+
