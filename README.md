@@ -33,7 +33,7 @@ import io.opentracing.Tracer;
         private final Tracer tracer;
 
         private void start() throws IOException {
-            TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
+            TracingServerInterceptor tracingInterceptor = TracingServerInterceptor
                 .newBuilder()
                 .withTracer(this.tracer)
                 .build();
@@ -71,7 +71,7 @@ import io.opentracing.Tracer;import io.opentracing.contrib.grpc.TracingClientInt
                 .usePlaintext(true)
                 .build();
 
-            TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
+            TracingClientInterceptor tracingInterceptor = TracingClientInterceptor
                 .newBuilder()
                 .withTracer(this.tracer)
                 .build();
@@ -97,7 +97,7 @@ A `TracingServerInterceptor` uses default settings, which you can override by cr
 ### Example
 
 ```java
-    TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
+    TracingServerInterceptor tracingInterceptor = TracingServerInterceptor
         .newBuilder()
         .withTracer(tracer)
         .withStreaming()
@@ -128,7 +128,7 @@ A `TracingClientInterceptor` also has default settings, which you can override b
 ```java
 import io.opentracing.Span;
 
-    TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
+    TracingClientInterceptor tracingInterceptor = TracingClientInterceptor
         .newBuilder()
         .withTracer(tracer)
         .withStreaming()
@@ -230,7 +230,7 @@ For example, if you're creating the client in an environment that has the active
 ```java
 import io.opentracing.Span;
 
-    TracingClientInterceptor interceptor = new TracingClientInterceptor
+    TracingClientInterceptor interceptor = TracingClientInterceptor
         .newBuilder().withTracer(tracer)
         ...
         .withActiveSpanSource(new ActiveSpanSource() {
@@ -255,7 +255,7 @@ Instead of `ActiveSpanSource` it's possible to use `ActiveSpanContextSource` if 
 ```java
 import io.opentracing.Span;
 
-    TracingClientInterceptor interceptor = new TracingClientInterceptor
+    TracingClientInterceptor interceptor = TracingClientInterceptor
         .newBuilder().withTracer(tracer)
         ...
         .withActiveSpanContextSource(new ActiveSpanContextSource() {
@@ -280,7 +280,7 @@ If you want to add custom tags or logs to the server and client spans, then you 
 Multiple different decorators may be added to the builder.
 
 ```java
-TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
+TracingClientInterceptor clientInterceptor = TracingClientInterceptor
     .newBuilder().withTracer(tracer)
     ...
     .withClientSpanDecorator(new ClientSpanDecorator() {
@@ -299,7 +299,7 @@ TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
     ...
     .build();
     
-TracingServerInterceptor serverInterceptor = new TracingServerInterceptor
+TracingServerInterceptor serverInterceptor = TracingServerInterceptor
     .newBuilder().withTracer(tracer)
     ...
     .withServerSpanDecorator(new ServerSpanDecorator() {
