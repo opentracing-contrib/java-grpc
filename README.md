@@ -34,7 +34,7 @@ import io.opentracing.Tracer;
 
         private void start() throws IOException {
             TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
-                .Builder()
+                .newBuilder()
                 .withTracer(this.tracer)
                 .build();
             
@@ -72,7 +72,7 @@ import io.opentracing.Tracer;import io.opentracing.contrib.grpc.TracingClientInt
                 .build();
 
             TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
-                .Builder()
+                .newBuilder()
                 .withTracer(this.tracer)
                 .build();
             
@@ -129,7 +129,7 @@ A `TracingClientInterceptor` also has default settings, which you can override b
 import io.opentracing.Span;
 
     TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
-        .Builder()
+        .newBuilder()
         .withTracer(tracer)
         .withStreaming()
         .withVerbosity()
@@ -231,7 +231,7 @@ For example, if you're creating the client in an environment that has the active
 import io.opentracing.Span;
 
     TracingClientInterceptor interceptor = new TracingClientInterceptor
-        .Builder().withTracer(tracer)
+        .newBuilder().withTracer(tracer)
         ...
         .withActiveSpanSource(new ActiveSpanSource() {
             @Override
@@ -256,7 +256,7 @@ Instead of `ActiveSpanSource` it's possible to use `ActiveSpanContextSource` if 
 import io.opentracing.Span;
 
     TracingClientInterceptor interceptor = new TracingClientInterceptor
-        .Builder().withTracer(tracer)
+        .newBuilder().withTracer(tracer)
         ...
         .withActiveSpanContextSource(new ActiveSpanContextSource() {
             @Override
@@ -281,7 +281,7 @@ Multiple different decorators may be added to the builder.
 
 ```java
 TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
-    .Builder().withTracer(tracer)
+    .newBuilder().withTracer(tracer)
     ...
     .withClientSpanDecorator(new ClientSpanDecorator() {
         @Override
@@ -300,7 +300,7 @@ TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
     .build();
     
 TracingServerInterceptor serverInterceptor = new TracingServerInterceptor
-    .Builder().withTracer(tracer)
+    .newBuilder().withTracer(tracer)
     ...
     .withServerSpanDecorator(new ServerSpanDecorator() {
         @Override
@@ -346,5 +346,4 @@ blockingStub = GreeterGrpc.newBlockingStub(ClientInterceptors.intercept(channel,
 [cov-img]: https://coveralls.io/repos/github/opentracing-contrib/java-grpc/badge.svg?branch=master
 [cov]: https://coveralls.io/github/opentracing-contrib/java-grpc?branch=master
 [maven-img]: https://img.shields.io/maven-central/v/io.opentracing.contrib/opentracing-grpc.svg
-[maven]: http://search.maven.org/#search%7Cga%7C1%7Copentracing-grpc        
-        
+[maven]: http://search.maven.org/#search%7Cga%7C1%7Copentracing-grpc
