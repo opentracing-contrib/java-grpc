@@ -34,7 +34,8 @@ import io.opentracing.Tracer;
 
         private void start() throws IOException {
             TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
-                .Builder(this.tracer)
+                .Builder()
+                .withTracer(this.tracer)
                 .build();
             
             // If GlobalTracer is used: 
@@ -71,7 +72,8 @@ import io.opentracing.Tracer;import io.opentracing.contrib.grpc.TracingClientInt
                 .build();
 
             TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
-                .Builder(this.tracer)
+                .Builder()
+                .withTracer(this.tracer)
                 .build();
             
             // If GlobalTracer is used: 
@@ -96,7 +98,8 @@ A `TracingServerInterceptor` uses default settings, which you can override by cr
 
 ```java
     TracingServerInterceptor tracingInterceptor = new TracingServerInterceptor
-        .Builder(tracer)
+        .Builder
+        .withTracer(tracer)
         .withStreaming()
         .withVerbosity()
         .withOperationName(new OperationNameConstructor() {
@@ -126,7 +129,8 @@ A `TracingClientInterceptor` also has default settings, which you can override b
 import io.opentracing.Span;
 
     TracingClientInterceptor tracingInterceptor = new TracingClientInterceptor
-        .Builder(tracer)
+        .Builder()
+        .withTracer(tracer)
         .withStreaming()
         .withVerbosity()
         .withOperationName(new OperationNameConstructor() {
@@ -227,7 +231,7 @@ For example, if you're creating the client in an environment that has the active
 import io.opentracing.Span;
 
     TracingClientInterceptor interceptor = new TracingClientInterceptor
-        .Builder(tracer)
+        .Builder().withTracer(tracer)
         ...
         .withActiveSpanSource(new ActiveSpanSource() {
             @Override
@@ -252,7 +256,7 @@ Instead of `ActiveSpanSource` it's possible to use `ActiveSpanContextSource` if 
 import io.opentracing.Span;
 
     TracingClientInterceptor interceptor = new TracingClientInterceptor
-        .Builder(tracer)
+        .Builder().withTracer(tracer)
         ...
         .withActiveSpanContextSource(new ActiveSpanContextSource() {
             @Override
@@ -277,7 +281,7 @@ Multiple different decorators may be added to the builder.
 
 ```java
 TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
-    .Builder(tracer)
+    .Builder().withTracer(tracer)
     ...
     .withClientSpanDecorator(new ClientSpanDecorator() {
         @Override
@@ -296,7 +300,7 @@ TracingClientInterceptor clientInterceptor = new TracingClientInterceptor
     .build();
     
 TracingServerInterceptor serverInterceptor = new TracingServerInterceptor
-    .Builder(tracer)
+    .Builder().withTracer(tracer)
     ...
     .withServerSpanDecorator(new ServerSpanDecorator() {
         @Override
