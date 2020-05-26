@@ -190,7 +190,6 @@ public class TracingServerInterceptor implements ServerInterceptor {
               for (ServerCloseDecorator serverCloseDecorator : serverCloseDecorators) {
                 serverCloseDecorator.close(span, status, trailers);
               }
-
               super.close(status, trailers);
             }
           };
