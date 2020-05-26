@@ -168,7 +168,10 @@ public class TracingServerInterceptor implements ServerInterceptor {
                         .put(Fields.MESSAGE, "Server sent response message")
                         .build());
               }
-              super.sendMessage(message);
+
+              try (Scope ignored = tracer.scopeManager().activate(span)) {
+                super.sendMessage(message);
+              }
             }
 
             @Override
@@ -187,6 +190,7 @@ public class TracingServerInterceptor implements ServerInterceptor {
               for (ServerCloseDecorator serverCloseDecorator : serverCloseDecorators) {
                 serverCloseDecorator.close(span, status, trailers);
               }
+
               super.close(status, trailers);
             }
           };
