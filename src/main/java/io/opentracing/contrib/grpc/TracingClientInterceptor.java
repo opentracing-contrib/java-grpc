@@ -196,7 +196,10 @@ public class TracingClientInterceptor implements ClientInterceptor {
                             .put(Fields.MESSAGE, "Client received response message")
                             .build());
                   }
-                  super.onMessage(message);
+
+                  try (Scope ignored = tracer.scopeManager().activate(span)) {
+                    super.onMessage(message);
+                  }
                 }
 
                 @Override
