@@ -56,7 +56,8 @@ public class TracingInterceptorsTest {
   private final MockTracer clientTracer = new MockTracer();
   private final MockTracer serverTracer = new MockTracer();
 
-  @Rule public GrpcServerRule grpcServer = new GrpcServerRule();
+  @Rule
+  public GrpcServerRule grpcServer = new GrpcServerRule();
 
   @Before
   public void setUp() {

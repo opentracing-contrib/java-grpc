@@ -49,7 +49,8 @@ public class SecondClientInterceptor implements ClientInterceptor {
         assertNotNull(tracer.activeSpan());
         super.start(
             new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(
-                responseListener) {},
+                responseListener) {
+            },
             headers);
       }
 

@@ -47,7 +47,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
-/** An interceptor that applies tracing via OpenTracing to all client requests. */
+/**
+ * An interceptor that applies tracing via OpenTracing to all client requests.
+ */
 public class TracingClientInterceptor implements ClientInterceptor {
 
   private final Tracer tracer;
@@ -321,7 +323,9 @@ public class TracingClientInterceptor implements ClientInterceptor {
         .start();
   }
 
-  /** Builds the configuration of a TracingClientInterceptor. */
+  /**
+   * Builds the configuration of a TracingClientInterceptor.
+   */
   public static class Builder {
 
     private Tracer tracer;
@@ -334,7 +338,9 @@ public class TracingClientInterceptor implements ClientInterceptor {
     private Map<Class<?>, ClientSpanDecorator> clientSpanDecorators;
     private Map<Class<?>, ClientCloseDecorator> clientCloseDecorators;
 
-    /** Creates a Builder with GlobalTracer if present else NoopTracer. */
+    /**
+     * Creates a Builder with GlobalTracer if present else NoopTracer.
+     */
     private Builder() {
       this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
@@ -404,9 +410,9 @@ public class TracingClientInterceptor implements ClientInterceptor {
      * Provide the active span source.
      *
      * @param activeSpanSource that provides a method of getting the active span before the client
-     *     call
+     * call
      * @return this Builder configured to start client span as children of the span returned by
-     *     activeSpanSource.getActiveSpan()
+     * activeSpanSource.getActiveSpan()
      */
     public Builder withActiveSpanSource(ActiveSpanSource activeSpanSource) {
       this.activeSpanSource = activeSpanSource;
@@ -417,9 +423,9 @@ public class TracingClientInterceptor implements ClientInterceptor {
      * Provide the active span context source.
      *
      * @param activeSpanContextSource that provides a method of getting the active span context
-     *     before the client call
+     * before the client call
      * @return this Builder configured to start client span as children of the span context returned
-     *     by activeSpanContextSource.getActiveSpanContext()
+     * by activeSpanContextSource.getActiveSpanContext()
      */
     public Builder withActiveSpanContextSource(ActiveSpanContextSource activeSpanContextSource) {
       this.activeSpanContextSource = activeSpanContextSource;

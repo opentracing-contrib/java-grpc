@@ -16,10 +16,14 @@ package io.opentracing.contrib.grpc;
 
 import io.opentracing.SpanContext;
 
-/** An interface that defines how to get the current active span context. */
+/**
+ * An interface that defines how to get the current active span context.
+ */
 public interface ActiveSpanContextSource {
 
-  /** ActiveSpanContextSource implementation that always returns null as the active span context. */
+  /**
+   * ActiveSpanContextSource implementation that always returns null as the active span context.
+   */
   ActiveSpanContextSource NONE =
       new ActiveSpanContextSource() {
         @Override

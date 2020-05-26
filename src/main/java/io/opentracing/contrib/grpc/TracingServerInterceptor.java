@@ -45,7 +45,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/** An interceptor that applies tracing via OpenTracing to all requests to the server. */
+/**
+ * An interceptor that applies tracing via OpenTracing to all requests to the server.
+ */
 public class TracingServerInterceptor implements ServerInterceptor {
 
   private final Tracer tracer;
@@ -303,7 +305,9 @@ public class TracingServerInterceptor implements ServerInterceptor {
     return span;
   }
 
-  /** Builds the configuration of a TracingServerInterceptor. */
+  /**
+   * Builds the configuration of a TracingServerInterceptor.
+   */
   public static class Builder {
 
     private Tracer tracer;
@@ -314,7 +318,9 @@ public class TracingServerInterceptor implements ServerInterceptor {
     private Map<Class<?>, ServerSpanDecorator> serverSpanDecorators;
     private Map<Class<?>, ServerCloseDecorator> serverCloseDecorators;
 
-    /** Creates a Builder with GlobalTracer if present else NoopTracer. */
+    /**
+     * Creates a Builder with GlobalTracer if present else NoopTracer.
+     */
     private Builder() {
       this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;

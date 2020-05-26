@@ -26,14 +26,11 @@ import io.opentracing.Span;
 public interface ClientSpanDecorator {
 
   /**
-   * The method of the implementation is executed inside {@link
-   * TracingClientInterceptor#interceptCall}.
+   * The method of the implementation is executed inside {@link TracingClientInterceptor#interceptCall}.
    *
    * @param span The span created by {@link TracingClientInterceptor}
-   * @param callOptions The {@link ServerCall} parameter of {@link
-   *     TracingClientInterceptor#interceptCall}
-   * @param method The {@link MethodDescriptor} parameter of {@link
-   *     TracingClientInterceptor#interceptCall}
+   * @param callOptions The {@link ServerCall} parameter of {@link TracingClientInterceptor#interceptCall}
+   * @param method The {@link MethodDescriptor} parameter of {@link TracingClientInterceptor#interceptCall}
    */
   void interceptCall(Span span, MethodDescriptor method, CallOptions callOptions);
 }

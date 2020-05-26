@@ -16,7 +16,9 @@ package io.opentracing.contrib.grpc;
 
 import io.grpc.MethodDescriptor;
 
-/** Interface that allows span operation names to be constructed from an RPC's method descriptor. */
+/**
+ * Interface that allows span operation names to be constructed from an RPC's method descriptor.
+ */
 public interface OperationNameConstructor {
 
   /**

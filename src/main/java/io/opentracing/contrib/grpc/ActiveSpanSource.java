@@ -16,10 +16,14 @@ package io.opentracing.contrib.grpc;
 
 import io.opentracing.Span;
 
-/** An interface that defines how to get the current active span. */
+/**
+ * An interface that defines how to get the current active span.
+ */
 public interface ActiveSpanSource {
 
-  /** ActiveSpanSource implementation that always returns null as the active span. */
+  /**
+   * ActiveSpanSource implementation that always returns null as the active span.
+   */
   ActiveSpanSource NONE =
       new ActiveSpanSource() {
         @Override
