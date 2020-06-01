@@ -32,7 +32,6 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
-import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
@@ -342,7 +341,7 @@ public class TracingClientInterceptor implements ClientInterceptor {
      * Creates a Builder with GlobalTracer if present else NoopTracer.
      */
     private Builder() {
-      this.tracer = GlobalTracer.isRegistered() ? GlobalTracer.get() : NoopTracerFactory.create();
+      this.tracer = GlobalTracer.get();
       this.operationNameConstructor = OperationNameConstructor.DEFAULT;
       this.streaming = false;
       this.verbose = false;
