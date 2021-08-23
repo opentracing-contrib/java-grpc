@@ -31,6 +31,8 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
+import io.opentracing.contrib.grpc.TracingServerInterceptor.Builder;
+import io.opentracing.contrib.grpc.TracingServerInterceptor.ServerRequestAttribute;
 import io.opentracing.log.Fields;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
@@ -60,6 +62,8 @@ public class TracingClientInterceptor implements ClientInterceptor {
   private final ActiveSpanContextSource activeSpanContextSource;
   private final ImmutableList<ClientSpanDecorator> clientSpanDecorators;
   private final ImmutableList<ClientCloseDecorator> clientCloseDecorators;
+  private final Set<Metadata.Key<?>> excludedHeaders;
+  private final Set<Metadata.Key<?>> includedHeaders;
 
   private TracingClientInterceptor(Builder builder) {
     this.tracer = builder.tracer;
@@ -71,6 +75,11 @@ public class TracingClientInterceptor implements ClientInterceptor {
     this.activeSpanContextSource = builder.activeSpanContextSource;
     this.clientSpanDecorators = ImmutableList.copyOf(builder.clientSpanDecorators.values());
     this.clientCloseDecorators = ImmutableList.copyOf(builder.clientCloseDecorators.values());
+    if(builder.tracedAttributes.contains(ClientRequestAttribute.HEADERS) && builder.excludedHeaders.size() > 0 && builder.includedHeaders.size() > 0) {
+      throw new IllegalArgumentException("Only one of excludedHeaders or includedHeaders can be defined at the same time.");
+    }
+    this.excludedHeaders = builder.excludedHeaders;
+    this.includedHeaders = builder.includedHeaders;
   }
 
   /**
@@ -150,7 +159,7 @@ public class TracingClientInterceptor implements ClientInterceptor {
                     .build());
           }
           if (tracedAttributes.contains(ClientRequestAttribute.HEADERS)) {
-            GrpcTags.GRPC_HEADERS.set(span, headers);
+            GrpcTags.GRPC_HEADERS.set(span, massageHeaders(headers));
           }
 
           tracer.inject(
@@ -321,6 +330,22 @@ public class TracingClientInterceptor implements ClientInterceptor {
         .withTag(Tags.COMPONENT.getKey(), GrpcTags.COMPONENT_NAME)
         .start();
   }
+  
+  private Metadata massageHeaders(Metadata headers) {
+    if(this.excludedHeaders.size() > 0) {
+      Metadata massagedHeaders = new Metadata();
+      massagedHeaders.merge(headers);
+      for(Metadata.Key<?> excludedHeader : this.excludedHeaders) {
+        massagedHeaders.removeAll(excludedHeader);
+      }
+      return massagedHeaders;
+    } else if(this.includedHeaders.size() > 0) {
+      Metadata massagedHeaders = new Metadata();
+      massagedHeaders.merge(headers, this.includedHeaders);
+      return massagedHeaders;
+    }
+    return headers;
+  }
 
   /**
    * Builds the configuration of a TracingClientInterceptor.
@@ -336,6 +361,8 @@ public class TracingClientInterceptor implements ClientInterceptor {
     private ActiveSpanContextSource activeSpanContextSource;
     private Map<Class<?>, ClientSpanDecorator> clientSpanDecorators;
     private Map<Class<?>, ClientCloseDecorator> clientCloseDecorators;
+    private Set<Metadata.Key<?>> excludedHeaders;
+    private Set<Metadata.Key<?>> includedHeaders;
 
     /**
      * Creates a Builder with GlobalTracer if present else NoopTracer.
@@ -350,6 +377,8 @@ public class TracingClientInterceptor implements ClientInterceptor {
       this.activeSpanContextSource = ActiveSpanContextSource.NONE;
       this.clientSpanDecorators = new HashMap<>();
       this.clientCloseDecorators = new HashMap<>();
+      this.excludedHeaders = new HashSet<>();
+      this.includedHeaders = new HashSet<>();
     }
 
     /**
@@ -392,6 +421,35 @@ public class TracingClientInterceptor implements ClientInterceptor {
      */
     public Builder withTracedAttributes(ClientRequestAttribute... tracedAttributes) {
       this.tracedAttributes = new HashSet<>(Arrays.asList(tracedAttributes));
+      return this;
+    }
+    
+    /**
+     * Provide keys for headers that should be excluded from the trace.  Only applicable
+     * when {@link #withTracedAttributes(ClientRequestAttribute...)} contains {@link ClientRequestAttribute#HEADERS}.
+     * 
+     * Mutually exclusive with {@link #withIncludedHeaders(io.grpc.Metadata.Key...)}.
+     * 
+     * @param headerKeys
+     * @return this Builder configured to exclude the header keys
+     */
+    public Builder withExcludedHeaders(Metadata.Key<?>... headerKeys) {
+      this.excludedHeaders = new HashSet<>(Arrays.asList(headerKeys));
+      return this;
+    }
+    
+    /**
+     * Provide keys for headers that should be included in the trace.  Headers with any other
+     * key will be excluded.  Only applicable when {@link #withTracedAttributes(ClientRequestAttribute...)}
+     * contains {@link ClientRequestAttribute#HEADERS}.
+     * 
+     * Mutually exclusive with {@link #withExcludedHeaders(io.grpc.Metadata.Key...)}.
+     * 
+     * @param headerKeys
+     * @return this Builder configured to exclude the header keys
+     */
+    public Builder withIncludedHeaders(Metadata.Key<?>... headerKeys) {
+      this.includedHeaders = new HashSet<>(Arrays.asList(headerKeys));
       return this;
     }
 

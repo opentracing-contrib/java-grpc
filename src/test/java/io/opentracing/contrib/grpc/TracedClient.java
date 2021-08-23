@@ -17,9 +17,13 @@ package io.opentracing.contrib.grpc;
 import io.grpc.ClientInterceptor;
 import io.grpc.ClientInterceptors;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.opentracing.contrib.grpc.gen.GreeterGrpc;
+import io.opentracing.contrib.grpc.gen.GreeterGrpc.GreeterBlockingStub;
 import io.opentracing.contrib.grpc.gen.HelloReply;
 import io.opentracing.contrib.grpc.gen.HelloRequest;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 class TracedClient {
@@ -47,5 +51,18 @@ class TracedClient {
     } catch (Exception ignored) {
       return null;
     }
+  }
+  
+  HelloReply greetWithHeaders(Map<String, String> headers) {
+      try {
+          Metadata metadata = new Metadata();
+          for(Map.Entry<String, String> entry : headers.entrySet()) {
+              metadata.put(Metadata.Key.of(entry.getKey(), Metadata.ASCII_STRING_MARSHALLER), entry.getValue());
+          }
+          GreeterBlockingStub stub = MetadataUtils.attachHeaders(blockingStub, metadata);
+          return stub.sayHello(HelloRequest.newBuilder().setName("world").build());
+      } catch(Exception ignored) {
+          return null;
+      }
   }
 }
