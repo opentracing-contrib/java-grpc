@@ -31,6 +31,7 @@ import static org.mockito.Mockito.spy;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Metadata;
+import io.grpc.Metadata.Key;
 import io.grpc.MethodDescriptor;
 import io.grpc.ServerCall;
 import io.grpc.Status;
@@ -45,6 +46,7 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracerTestUtil;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -273,6 +275,80 @@ public class TracingServerInterceptorTest {
         .as("span should have tags for all server request attributes")
         .containsAll(SERVER_ATTRIBUTE_TAGS);
     assertFalse("span should have no baggage", span.context().baggageItems().iterator().hasNext());
+  }
+  
+  @Test
+  public void testTracedServerWithExcludedHeader() {
+    TracingServerInterceptor tracingInterceptor =
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withTracedAttributes(TracingServerInterceptor.ServerRequestAttribute.HEADERS)
+            .withExcludedHeaders(Metadata.Key.of("header2", Metadata.ASCII_STRING_MARSHALLER))
+            .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
+    
+    Map<String, String> headers = new HashMap<>();
+    headers.put("header1", "value1");
+    headers.put("header2", "value2");
+
+    assertEquals("call should complete successfully", "Hello world", client.greetWithHeaders(headers).getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals(
+        "one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(),
+        1);
+
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    Assertions.assertThat(span.tags())
+      .as("span should have base server tags")
+      .containsKey(GrpcTags.GRPC_HEADERS.getKey());
+    String headerString = (String) span.tags().get(GrpcTags.GRPC_HEADERS.getKey());
+    Assertions.assertThat(headerString)
+      .as("headers should have header1")
+      .contains("header1");
+    Assertions.assertThat(headerString)
+      .as("headers should NOT have header2")
+      .doesNotContain("header2");
+  }
+  
+  @Test
+  public void testTracedServerWithIncludedHeader() {
+    TracingServerInterceptor tracingInterceptor =
+        TracingServerInterceptor.newBuilder()
+            .withTracer(serverTracer)
+            .withTracedAttributes(TracingServerInterceptor.ServerRequestAttribute.HEADERS)
+            .withIncludedHeaders(Metadata.Key.of("header2", Metadata.ASCII_STRING_MARSHALLER))
+            .build();
+    TracedService.addGeeterService(grpcServer.getServiceRegistry(), tracingInterceptor);
+    
+    Map<String, String> headers = new HashMap<>();
+    headers.put("header1", "value1");
+    headers.put("header2", "value2");
+
+    assertEquals("call should complete successfully", "Hello world", client.greetWithHeaders(headers).getMessage());
+    await().atMost(5, TimeUnit.SECONDS).until(reportedSpansSize(serverTracer), equalTo(1));
+    assertEquals(
+        "one span should have been created and finished for one client request",
+        serverTracer.finishedSpans().size(),
+        1);
+
+    MockSpan span = serverTracer.finishedSpans().get(0);
+    assertEquals("span should have prefix", span.operationName(), "helloworld.Greeter/SayHello");
+    assertEquals("span should have no parents", span.parentId(), 0);
+    assertEquals("span should have no logs", span.logEntries().size(), 0);
+    Assertions.assertThat(span.tags())
+      .as("span should have base server tags")
+      .containsKey(GrpcTags.GRPC_HEADERS.getKey());
+    String headerString = (String) span.tags().get(GrpcTags.GRPC_HEADERS.getKey());
+    Assertions.assertThat(headerString)
+      .as("headers should NOT have header1")
+      .doesNotContain("header1");
+    Assertions.assertThat(headerString)
+      .as("headers should have header2")
+      .contains("header2");
   }
 
   @Test
