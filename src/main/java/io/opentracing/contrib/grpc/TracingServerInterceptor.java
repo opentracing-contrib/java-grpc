@@ -56,6 +56,8 @@ public class TracingServerInterceptor implements ServerInterceptor {
   private final Set<ServerRequestAttribute> tracedAttributes;
   private final ImmutableList<ServerSpanDecorator> serverSpanDecorators;
   private final ImmutableList<ServerCloseDecorator> serverCloseDecorators;
+  private final Set<Metadata.Key<?>> excludedHeaders;
+  private final Set<Metadata.Key<?>> includedHeaders;
 
   private TracingServerInterceptor(Builder builder) {
     this.tracer = builder.tracer;
@@ -65,6 +67,11 @@ public class TracingServerInterceptor implements ServerInterceptor {
     this.tracedAttributes = builder.tracedAttributes;
     this.serverSpanDecorators = ImmutableList.copyOf(builder.serverSpanDecorators.values());
     this.serverCloseDecorators = ImmutableList.copyOf(builder.serverCloseDecorators.values());
+    if(builder.tracedAttributes.contains(ServerRequestAttribute.HEADERS) && builder.excludedHeaders.size() > 0 && builder.includedHeaders.size() > 0) {
+      throw new IllegalArgumentException("Only one of excludedHeaders or includedHeaders can be defined at the same time.");
+    }
+    this.excludedHeaders = builder.excludedHeaders;
+    this.includedHeaders = builder.includedHeaders;
   }
 
   /**
@@ -131,7 +138,7 @@ public class TracingServerInterceptor implements ServerInterceptor {
             GrpcTags.GRPC_CALL_ATTRIBUTES.set(span, call.getAttributes());
             break;
           case HEADERS:
-            GrpcTags.GRPC_HEADERS.set(span, headers);
+            GrpcTags.GRPC_HEADERS.set(span, massageHeaders(headers));
             break;
           case PEER_ADDRESS:
             GrpcTags.PEER_ADDRESS.set(span, call.getAttributes());
@@ -303,6 +310,22 @@ public class TracingServerInterceptor implements ServerInterceptor {
     }
     return span;
   }
+  
+  private Metadata massageHeaders(Metadata headers) {
+    if(this.excludedHeaders.size() > 0) {
+      Metadata massagedHeaders = new Metadata();
+      massagedHeaders.merge(headers);
+      for(Metadata.Key<?> excludedHeader : this.excludedHeaders) {
+        massagedHeaders.removeAll(excludedHeader);
+      }
+      return massagedHeaders;
+    } else if(this.includedHeaders.size() > 0) {
+      Metadata massagedHeaders = new Metadata();
+      massagedHeaders.merge(headers, this.includedHeaders);
+      return massagedHeaders;
+    }
+    return headers;
+  }
 
   /**
    * Builds the configuration of a TracingServerInterceptor.
@@ -316,6 +339,8 @@ public class TracingServerInterceptor implements ServerInterceptor {
     private Set<ServerRequestAttribute> tracedAttributes;
     private Map<Class<?>, ServerSpanDecorator> serverSpanDecorators;
     private Map<Class<?>, ServerCloseDecorator> serverCloseDecorators;
+    private Set<Metadata.Key<?>> excludedHeaders;
+    private Set<Metadata.Key<?>> includedHeaders;
 
     /**
      * Creates a Builder with GlobalTracer if present else NoopTracer.
@@ -328,6 +353,8 @@ public class TracingServerInterceptor implements ServerInterceptor {
       this.tracedAttributes = new HashSet<>();
       this.serverSpanDecorators = new HashMap<>();
       this.serverCloseDecorators = new HashMap<>();
+      this.excludedHeaders = new HashSet<>();
+      this.includedHeaders = new HashSet<>();
     }
 
     /**
@@ -360,6 +387,35 @@ public class TracingServerInterceptor implements ServerInterceptor {
      */
     public Builder withTracedAttributes(ServerRequestAttribute... attributes) {
       this.tracedAttributes = new HashSet<>(Arrays.asList(attributes));
+      return this;
+    }
+    
+    /**
+     * Provide keys for headers that should be excluded from the trace.  Only applicable
+     * when {@link #withTracedAttributes(ServerRequestAttribute...)} contains {@link ServerRequestAttribute#HEADERS}.
+     * 
+     * Mutually exclusive with {@link #withIncludedHeaders(io.grpc.Metadata.Key...)}.
+     * 
+     * @param headerKeys
+     * @return this Builder configured to exclude the header keys
+     */
+    public Builder withExcludedHeaders(Metadata.Key<?>... headerKeys) {
+      this.excludedHeaders = new HashSet<>(Arrays.asList(headerKeys));
+      return this;
+    }
+    
+    /**
+     * Provide keys for headers that should be included in the trace.  Headers with any other
+     * key will be excluded.  Only applicable when {@link #withTracedAttributes(ServerRequestAttribute...)}
+     * contains {@link ServerRequestAttribute#HEADERS}.
+     * 
+     * Mutually exclusive with {@link #withExcludedHeaders(io.grpc.Metadata.Key...)}.
+     * 
+     * @param headerKeys
+     * @return this Builder configured to exclude the header keys
+     */
+    public Builder withIncludedHeaders(Metadata.Key<?>... headerKeys) {
+      this.includedHeaders = new HashSet<>(Arrays.asList(headerKeys));
       return this;
     }
 
