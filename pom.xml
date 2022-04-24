@@ -193,7 +193,7 @@
         <version>2.22.2</version>
         <configuration>
           <reuseForks>false</reuseForks>
-          <forkCount>1</forkCount>
+          <forkCount>1.5C</forkCount>
         </configuration>
       </plugin>
       <plugin>
