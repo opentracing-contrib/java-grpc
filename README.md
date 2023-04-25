@@ -146,7 +146,7 @@ import io.opentracing.Span;
                 return OpenTracingContextKey.activeSpan();
             }
         })
-        .withTracingAttributes(ClientRequestAttribute.ALL_CALL_OPTIONS,
+        .withTracedAttributes(ClientRequestAttribute.ALL_CALL_OPTIONS,
             ClientRequestAttribute.HEADERS)
         .build();
 ```
